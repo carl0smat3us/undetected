@@ -1,14 +1,14 @@
-import time
 import logging
+import time
+
 logging.basicConfig(level=10)
 
+import selenium.webdriver.support.expected_conditions as EC  # noqa
 from selenium.common.exceptions import WebDriverException
 from selenium.webdriver.remote.webdriver import By
-import selenium.webdriver.support.expected_conditions as EC  # noqa
 from selenium.webdriver.support.wait import WebDriverWait
 
-
-import undetected_chromedriver as uc
+import undetected as uc
 
 
 def main(args=None):
@@ -30,11 +30,11 @@ def main(args=None):
     driver.get("https://www.google.com")
 
     # accept the terms
-    driver.find_elements(By.XPATH, '//*[contains(text(), "Reject all")]')[
-        -1
-    ].click()  # ;)
+    driver.execute_script("""document.querySelector("#W0wltc").click()""")
 
-    inp_search = driver.find_element(By.XPATH, '//input[@title="Search"]')
+    sleep(5)
+
+    inp_search = driver.find_element(By.CSS_SELECTOR, "[name='q']")
 
     inp_search.send_keys(
         "site:stackoverflow.com undetected chromedriver\n"
@@ -165,9 +165,8 @@ def main(args=None):
     sleep(5)
 
     print("lets go to UC project page")
-    driver.get("https://www.github.com/ultrafunkamsterdam/undetected-chromedriver")
+    driver.get("https://www.github.com/ultrafunkamsterdam/undetected")
 
-    
     sleep(2)
     driver.quit()
 
