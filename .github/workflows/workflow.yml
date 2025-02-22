@@ -35,7 +35,7 @@ jobs:
       run: |
         poetry run task test_workflow
     - name: Upload a Build Artifact
-      uses: actions/upload-artifact@v3.1.2
+      uses: actions/upload-artifact@v4
       with:
         # Artifact name
         name:  screenshots
