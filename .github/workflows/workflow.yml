@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.8", "3.9", "3.10","3.11"]
+        python-version: ["3.9", "3.10","3.11"]
 
     steps:
     - uses: actions/checkout@v3
@@ -30,13 +30,14 @@ jobs:
       uses: actions/setup-python@v3
       with:
         python-version: ${{ matrix.python-version }}
-    - name: Install package
+    - name: Install Poetry
       run: |
-        python -m pip install --upgrade pip
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; else pip install -U . ; fi
+        curl -sSL https://install.python-poetry.org | python3 -
+    - name: Install Dependencies
+      run: poetry install --no-root
     - name: run example
       run: |
-        python example/test_workflow.py
+        poetry run task test_workflow
     - name: Upload a Build Artifact
       uses: actions/upload-artifact@v3.1.2
       with:

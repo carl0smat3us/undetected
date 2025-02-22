@@ -32,9 +32,12 @@ setuptools = "^75.8.0"
 [tool.poetry.group.dev.dependencies]
 isort = "^6.0.0"
 black = "^25.1.0"
+twine = "^6.1.0"
+build = "^1.2.2.post1"
 
 [tool.taskipy.tasks]
 lint = "black undetected/ && isort undetected/ && black example/ && isort example/"
+test_workflow = "python -m example.test_workflow"
 
 [tool.poetry.urls]
 Issues = "https://github.com/kamajus/undetected/issues"
