@@ -777,7 +777,6 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
                         "When removing the temp profile, a %s occured: %s\nretrying..."
                         % (e.__class__.__name__, e)
                     )
-                    time.sleep(0.1)
                 else:
                     logger.debug("successfully removed %s" % self.user_data_dir)
                     break
