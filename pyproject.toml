@@ -7,7 +7,7 @@ name = "undetected"
 version = "0.0.2"
 description = "Selenium.webdriver.Chrome replacement with compatibility for Brave, and other Chromium based browsers. Not triggered by CloudFlare/Imperva/hCaptcha and such. NOTE: results may vary due to many factors. No guarantees are given, except for ongoing efforts in understanding detection algorithms."
 authors = [
-  { name="Carlos Mateus", email="hi@carlosmateus.fr" },
+  { name="Carlos Mateus", email="carlosmateus@outlook.be" },
 ]
 license = "GPL-3.0"
 readme = "README.md"
@@ -40,5 +40,5 @@ lint = "black undetected/ && isort undetected/ && black example/ && isort exampl
 test_workflow = "python -m example.test_workflow"
 
 [tool.poetry.urls]
-Issues = "https://github.com/kamajus/undetected/issues"
-Homepage = "https://github.com/kamajus/undetected"
+Issues = "https://github.com/carl0smat3us/undetected/issues"
+Homepage = "https://github.com/carl0smat3us/undetected"
