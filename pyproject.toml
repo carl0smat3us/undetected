@@ -40,5 +40,5 @@ lint = "black undetected/ && isort undetected/ && black example/ && isort exampl
 test_workflow = "python -m example.test_workflow"
 
 [tool.poetry.urls]
-Issues = "https://github.com/kamajus/undetected/issues"
-Homepage = "https://github.com/kamajus/undetected"
+Issues = "https://github.com/lovebrownie/undetected/issues"
+Homepage = "https://github.com/lovebrownie/undetected"
