@@ -6,7 +6,7 @@ import json
 import logging
 import os
 import pathlib
-import platform
+import secrets
 import random
 import re
 import shutil
@@ -58,7 +58,7 @@ class Patcher(object):
         """
         self.force = force
         self._custom_exe_path = False
-        prefix = "undetected"
+        prefix = secrets.token_hex(8)
         self.user_multi_procs = user_multi_procs
 
         self.is_old_chromedriver = version_main and version_main <= 114
