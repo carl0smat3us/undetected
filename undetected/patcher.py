@@ -14,9 +14,10 @@ import string
 import sys
 import time
 import zipfile
-from distutils.version import LooseVersion
 from multiprocessing import Lock
 from urllib.request import urlopen, urlretrieve
+
+from packaging.version import Version
 
 logger = logging.getLogger(__name__)
 
@@ -172,7 +173,7 @@ class Patcher(object):
             pass
 
         release = self.fetch_release_number()
-        self.version_main = release.version[0]
+        self.version_main = release.major
         self.version_full = release
         self.unzip_package(self.fetch_package())
         return self.patch()
@@ -232,14 +233,14 @@ class Patcher(object):
         """
         Gets the latest major version available, or the latest major version of self.target_version if set explicitly.
         :return: version string
-        :rtype: LooseVersion
+        :rtype: Version
         """
         # Endpoint for old versions of Chromedriver (114 and below)
         if self.is_old_chromedriver:
             path = f"/latest_release_{self.version_main}"
             path = path.upper()
             logger.debug("getting release number from %s" % path)
-            return LooseVersion(urlopen(self.url_repo + path).read().decode())
+            return Version(urlopen(self.url_repo + path).read().decode())
 
         # Endpoint for new versions of Chromedriver (115+)
         if not self.version_main:
@@ -250,7 +251,7 @@ class Patcher(object):
                 response = conn.read().decode()
 
             last_versions = json.loads(response)
-            return LooseVersion(last_versions["channels"]["Stable"]["version"])
+            return Version(last_versions["channels"]["Stable"]["version"])
 
         # Fetch the latest minor version of the major version provided
         path = "/latest-versions-per-milestone-with-downloads.json"
@@ -259,16 +260,14 @@ class Patcher(object):
             response = conn.read().decode()
 
         major_versions = json.loads(response)
-        return LooseVersion(
-            major_versions["milestones"][str(self.version_main)]["version"]
-        )
+        return Version(major_versions["milestones"][str(self.version_main)]["version"])
 
     def parse_exe_version(self):
         with io.open(self.executable_path, "rb") as f:
             for line in iter(lambda: f.readline(), b""):
                 match = re.search(rb"platform_handle\x00content\x00([0-9.]*)", line)
                 if match:
-                    return LooseVersion(match[1].decode())
+                    return Version(match[1].decode())
 
     def fetch_package(self):
         """
@@ -280,7 +279,7 @@ class Patcher(object):
         if self.is_old_chromedriver:
             download_url = "%s/%s/%s" % (
                 self.url_repo,
-                self.version_full.vstring,
+                str(self.version_full),
                 zip_name,
             )
         else:
@@ -288,7 +287,7 @@ class Patcher(object):
             download_url = (
                 "https://storage.googleapis.com/chrome-for-testing-public/%s/%s/%s"
             )
-            download_url %= (self.version_full.vstring, self.platform_name, zip_name)
+            download_url %= (str(self.version_full), self.platform_name, zip_name)
 
         logger.debug("downloading from %s" % download_url)
         return urlretrieve(download_url)[0]
