@@ -1,5 +1,6 @@
 import base64
 import logging
+import os
 from pathlib import Path
 
 import selenium.webdriver.support.expected_conditions as EC
@@ -9,7 +10,11 @@ from selenium.webdriver.support.wait import WebDriverWait
 from tests import find_and_prepare_chrome, logger
 import undetected as uc
 
-tmp_path = Path("/tmp/screenshots")
+if os.name == "nt":
+    tmp_path = Path("C:/temp/screenshots")
+else:
+    tmp_path = Path("/tmp/screenshots")
+
 tmp_path.mkdir(parents=True, exist_ok=True)
 
 def test_example():
