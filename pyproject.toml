@@ -1,12 +1,9 @@
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
-
 [project]
 name = "undetected"
 version = "0.0.3"
 description = "Selenium.webdriver.Chrome replacement with compatibility for Brave, and other Chromium based browsers. Not triggered by CloudFlare/Imperva/hCaptcha and such. NOTE: results may vary due to many factors. No guarantees are given, except for ongoing efforts in understanding detection algorithms."
 authors = [
+  { name="UltrafunkAmsterdam", email="info@blackhat-security.nl" },
   { name="Carlos Mateus", email="carlosmateus@outlook.be" },
 ]
 license = "GPL-3.0"
@@ -20,9 +17,9 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11"
 ]
+requires-python = ">=3.11,<4"
 
 [tool.poetry.dependencies]
-python = ">=3.9,<4.0"
 selenium = "^4.29.0"
 requests = "^2.32.3"
 websockets = "^15.0"
@@ -34,11 +31,15 @@ isort = "^6.0.0"
 black = "^25.1.0"
 twine = "^6.1.0"
 build = "^1.2.2.post1"
+pytest = "^9.0.2"
 
 [tool.taskipy.tasks]
 lint = "black undetected/ && isort undetected/ && black example/ && isort example/"
-test_workflow = "python -m example.test_workflow"
 
 [tool.poetry.urls]
 Issues = "https://github.com/carl0smat3us/undetected/issues"
 Homepage = "https://github.com/carl0smat3us/undetected"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
