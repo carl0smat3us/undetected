@@ -6,11 +6,13 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12"]
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.12"]
+
+    runs-on: ${{ matrix.os }}
 
     steps:
       - uses: actions/checkout@v3
@@ -20,33 +22,55 @@ jobs:
         with:
           chrome-version: stable
 
-      - name: Set Chrome in PATH
-        run: |
-          echo "/opt/hostedtoolcache/chromium/stable/x64" >> $GITHUB_PATH
+      - name: Set Chrome in PATH on Linux
+        if: runner.os == 'Linux'
+        run: echo "/opt/hostedtoolcache/chromium/stable/x64" >> $GITHUB_PATH
 
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set Chrome in PATH on Windows
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          $chromePath = "C:\tools\chrome"
+          echo "$chromePath" >> $Env:GITHUB_PATH
+
+      - name: Set up Python
         uses: actions/setup-python@v3
         with:
           python-version: ${{ matrix.python-version }}
 
       - name: Install Poetry
-        run: |
-          curl -sSL https://install.python-poetry.org | python3 -
+        uses: abatilo/actions-poetry@v4
 
-      - name: Install dependencies
+      - name: Setup local virtual environment
         run: |
-          poetry install --no-root
+          poetry config virtualenvs.create true --local
+          poetry config virtualenvs.in-project true --local
 
-      - name: Run example test and upload screenshots
+      - uses: actions/cache@v3
+        name: Cache the virtual environment
+        with:
+          path: ./.venv
+          key: venv-${{ hashFiles('poetry.lock') }}
+
+      - name: Install project dependencies
+        run: poetry install --with dev --no-root
+
+      - name: Run example test
         run: poetry run pytest tests/test_example.py
 
-      - name: Upload workflow screenshots
-        if: always()
+      - name: Upload workflow screenshots on Linux
+        if: runner.os == 'Linux' && always()
         uses: actions/upload-artifact@v4
         with:
           name: screenshots-${{ matrix.python-version }}-${{ github.run_id }}
           path: /tmp/screenshots/*
 
+      - name: Upload workflow screenshots on Windows
+        if: runner.os == 'Windows' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-${{ matrix.python-version }}-${{ github.run_id }}
+          path: C:\temp\screenshots\*
+
       - name: Run multiprocess test
-        run: |
-          poetry run pytest tests/test_multiprocess.py
+        run: poetry run pytest tests/test_multiprocess.py
