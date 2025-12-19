@@ -38,8 +38,7 @@ jobs:
           poetry install --no-root
 
       - name: Run example test and upload screenshots
-        run: |
-          poetry run pytest test_example
+        run: poetry run pytest tests/test_example.py
 
       - name: Upload workflow screenshots
         if: always()
@@ -50,4 +49,4 @@ jobs:
 
       - name: Run multiprocess test
         run: |
-          poetry run pytest test_multiprocess
+          poetry run pytest tests/test_multiprocess.py
