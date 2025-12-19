@@ -353,6 +353,7 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
             not options.binary_location
             or not pathlib.Path(options.binary_location).exists()
         ):
+            print("c'est ici vraiment")
             raise FileNotFoundError(
                 "\n---------------------\n"
                 "Could not determine browser executable."
@@ -419,7 +420,7 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
                 json.dump(config, fs)
                 fs.truncate()  # the file might be shorter
                 logger.debug("fixed exit_type flag")
-        except Exception as e:
+        except Exception:
             logger.debug("did not find a bad exit_type flag ")
 
         self.options = options
