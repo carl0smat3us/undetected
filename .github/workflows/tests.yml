@@ -1,0 +1,53 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Chrome
+        uses: browser-actions/setup-chrome@v1.2.0
+        with:
+          chrome-version: stable
+
+      - name: Set Chrome in PATH
+        run: |
+          echo "/opt/hostedtoolcache/chromium/stable/x64" >> $GITHUB_PATH
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v3
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+
+      - name: Install dependencies
+        run: |
+          poetry install --no-root
+
+      - name: Run example test and upload screenshots
+        run: |
+          poetry run pytest test_example
+
+      - name: Upload workflow screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-${{ matrix.python-version }}-${{ github.run_id }}
+          path: /tmp/screenshots/*
+
+      - name: Run multiprocess test
+        run: |
+          poetry run pytest test_multiprocess
