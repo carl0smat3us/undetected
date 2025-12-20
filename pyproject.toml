@@ -20,7 +20,7 @@ classifiers = [
 requires-python = ">=3.11,<4"
 
 [tool.poetry.dependencies]
-selenium = "^4.29.0"
+selenium = "^4.39.0"
 requests = "^2.32.3"
 websockets = "^15.0"
 taskipy = "^1.14.1"
