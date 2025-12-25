@@ -348,9 +348,12 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
         options.add_argument("--lang=%s" % language)
 
         if not options.binary_location:
-            options.binary_location = (
-                browser_executable_path or find_chrome_executable()
-            )
+            if browser_executable_path:
+                options.binary_location = browser_executable_path
+            else:
+                chrome_executable = find_chrome_executable()
+                if chrome_executable:
+                    options.binary_location = chrome_executable
 
         if (
             not options.binary_location
@@ -771,6 +774,7 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
             hasattr(self, "keep_user_data_dir")
             and hasattr(self, "user_data_dir")
             and not self.keep_user_data_dir
+            and self.user_data_dir
         ):
             for _ in range(5):
                 try:
