@@ -331,11 +331,17 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
 
         if not language:
             try:
-                import locale
+                from locale import getlocale
 
-                language = locale.getdefaultlocale()[0].replace("_", "-")
+                loc = getlocale()[0]
+
+                if loc is None:
+                    raise Exception
+
+                language = loc.replace("_", "-")
             except Exception:
                 pass
+
             if not language:
                 language = "en-US"
 
