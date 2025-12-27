@@ -10,12 +10,9 @@ import tempfile
 import time
 from weakref import finalize
 
-import selenium.webdriver.chrome.service
 import selenium.webdriver.chrome.webdriver
 import selenium.webdriver.chromium.service
 import selenium.webdriver.remote.command
-import selenium.webdriver.remote.webdriver
-from selenium.webdriver.common.by import By
 
 from .cdp import CDP
 from .dprocess import start_detached
@@ -94,7 +91,7 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
         keep_alive=True,
         log_level=0,
         headless=False,
-        version_main=None,
+        version_main: int | None = None,
         patcher_force_close=False,
         suppress_welcome=True,
         use_subprocess=True,
@@ -334,26 +331,34 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
 
         if not language:
             try:
-                import locale
+                from locale import getlocale
 
-                language = locale.getdefaultlocale()[0].replace("_", "-")
+                loc = getlocale()[0]
+
+                if loc is None:
+                    raise Exception
+
+                language = loc.replace("_", "-")
             except Exception:
                 pass
+
             if not language:
                 language = "en-US"
 
         options.add_argument("--lang=%s" % language)
 
         if not options.binary_location:
-            options.binary_location = (
-                browser_executable_path or find_chrome_executable()
-            )
+            if browser_executable_path:
+                options.binary_location = browser_executable_path
+            else:
+                chrome_executable = find_chrome_executable()
+                if chrome_executable:
+                    options.binary_location = chrome_executable
 
         if (
             not options.binary_location
             or not pathlib.Path(options.binary_location).exists()
         ):
-            print("c'est ici vraiment")
             raise FileNotFoundError(
                 "\n---------------------\n"
                 "Could not determine browser executable."
@@ -753,6 +758,7 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
             logger.debug("webdriver process ended")
         except (AttributeError, RuntimeError, OSError):
             pass
+
         try:
             self.reactor.event.set()
             logger.debug("shutting down reactor")
@@ -763,10 +769,12 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
             logger.debug("gracefully closed browser")
         except Exception as e:  # noqa
             pass
+
         if (
             hasattr(self, "keep_user_data_dir")
             and hasattr(self, "user_data_dir")
             and not self.keep_user_data_dir
+            and self.user_data_dir
         ):
             for _ in range(5):
                 try:
@@ -850,8 +858,11 @@ def find_chrome_executable():
 
     """
     candidates = set()
-    if IS_POSIX:
-        for item in os.environ.get("PATH").split(os.pathsep):
+
+    PATH = os.environ.get("PATH")
+
+    if IS_POSIX and PATH:
+        for item in PATH.split(os.pathsep):
             for subitem in (
                 "google-chrome",
                 "chromium",
@@ -873,8 +884,9 @@ def find_chrome_executable():
             ("PROGRAMFILES", "PROGRAMFILES(X86)", "LOCALAPPDATA", "PROGRAMW6432"),
         ):
             if item is not None:
-                for subitem in ("Google/Chrome/Application",):
+                for subitem in ("Google/Chrome/Application", "Chromium/Application"):
                     candidates.add(os.sep.join((item, subitem, "chrome.exe")))
+
     for candidate in candidates:
         logger.debug("checking if %s exists and is executable" % candidate)
         if os.path.exists(candidate) and os.access(candidate, os.X_OK):
