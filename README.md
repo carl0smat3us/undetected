@@ -1,5 +1,5 @@
-# Undetected Chromedriver
+# Undetected
 
-This is a fork of [`undetected-chromedriver`](https://github.com/ultrafunkamsterdam/undetected-chromedriver), a Selenium WebDriver replacement with enhanced compatibility for Brave and other Chromium-based browsers.  
+It aims to bypass common anti-bot and anti-detection mechanisms (such as Cloudflare) by patching the Selenium WebDriver and applying advanced stealth and fingerprinting techniques to better mimic real user behavior.
 
-It aims to bypass detection mechanisms like Cloudflare, Imperva, and hCaptcha, but results may vary depending on multiple factors. No guarantees are provided, but continuous efforts are made to improve evasion techniques.  
+**Note:** This project is a fork of [`undetected-chromedriver`](https://github.com/ultrafunkamsterdam/undetected-chromedriver).
