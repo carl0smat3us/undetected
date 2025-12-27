@@ -45,7 +45,7 @@ class Patcher(object):
         self,
         executable_path=None,
         force=False,
-        version_main: int = 0,
+        version_main: int | None = 0,
         user_multi_procs=False,
     ):
         """
