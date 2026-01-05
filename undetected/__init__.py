@@ -91,7 +91,6 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
         keep_alive=True,
         log_level=0,
         headless=False,
-        version_main: int | None = None,
         patcher_force_close=False,
         suppress_welcome=True,
         use_subprocess=True,
@@ -170,11 +169,6 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
             Specify whether you want to use the browser in headless mode.
             warning: this lowers undetectability and not fully supported.
 
-        version_main: int, optional, default: None (=auto)
-            if you, for god knows whatever reason, use
-            an older version of Chrome. You can specify it's full rounded version number
-            here. Example: 87 for all versions of 87
-
         patcher_force_close: bool, optional, default: False
             instructs the patcher to do whatever it can to access the chromedriver binary
             if the file is locked, it will force shutdown all instances.
@@ -220,13 +214,32 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
         """
 
         finalize(self, self._ensure_close, self)
+
+        if not browser_executable_path:
+            browser_executable_path = find_chrome_executable()
+
+        if (
+            not browser_executable_path
+            or not pathlib.Path(browser_executable_path).exists()
+        ):
+            raise FileNotFoundError("Could not determine browser executable.")
+
+        version_main = get_chrome_version(browser_executable_path)
+
+        if not version_main:
+            raise ValueError("Could not determine browser version.")
+
+        version_main = int(version_main.split(".")[0])
+
         self.debug = debug
+
         self.patcher = Patcher(
+            version_main=version_main,
             executable_path=driver_executable_path,
             force=patcher_force_close,
-            version_main=version_main,
             user_multi_procs=user_multi_procs,
         )
+
         # self.patcher.auto(user_multiprocess = user_multi_num_procs)
         self.patcher.auto()
 
@@ -348,30 +361,7 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
 
         options.add_argument("--lang=%s" % language)
 
-        if not options.binary_location:
-            if browser_executable_path:
-                options.binary_location = browser_executable_path
-            else:
-                chrome_executable = find_chrome_executable()
-                if chrome_executable:
-                    options.binary_location = chrome_executable
-
-        if (
-            not options.binary_location
-            or not pathlib.Path(options.binary_location).exists()
-        ):
-            raise FileNotFoundError(
-                "\n---------------------\n"
-                "Could not determine browser executable."
-                "\n---------------------\n"
-                "Make sure your browser is installed in the default location (path).\n"
-                "If you are sure about the browser executable, you can specify it using\n"
-                "the `browser_executable_path='{}` parameter.\n\n".format(
-                    "/path/to/browser/executable"
-                    if IS_POSIX
-                    else "c:/path/to/your/browser.exe"
-                )
-            )
+        options.binary_location = browser_executable_path
 
         self._delay = 3
 
@@ -922,3 +912,30 @@ def find_chrome_executable():
             return os.path.normpath(candidate)
 
     return None
+
+
+def get_chrome_version(exe_path):
+    if not exe_path:
+        return None
+
+    try:
+        if sys.platform != "win32":
+            command = [exe_path, "--version"]
+        else:
+            command = [
+                "powershell",
+                "-Command",
+                f"& {{(Get-Item '{exe_path}').VersionInfo.FileVersion}}",
+            ]
+
+        output = subprocess.check_output(
+            command,
+            stderr=subprocess.DEVNULL,
+            text=True,
+        )
+
+        match = re.search(r"\d+\.\d+\.\d+\.\d+", output)
+        return match.group(0) if match else None
+
+    except (subprocess.SubprocessError, OSError):
+        return None
