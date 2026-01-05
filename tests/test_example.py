@@ -7,8 +7,8 @@ import selenium.webdriver.support.expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.support.wait import WebDriverWait
 
-from tests import find_and_prepare_chrome, logger
 import undetected as uc
+from tests import logger
 
 if os.name == "nt":
     tmp_path = Path("C:/temp/screenshots")
@@ -17,13 +17,9 @@ else:
 
 tmp_path.mkdir(parents=True, exist_ok=True)
 
-def test_example():
-    browser_executable_path = find_and_prepare_chrome()
 
-    driver = uc.Chrome(
-        headless=True,
-        browser_executable_path=browser_executable_path,
-    )
+def test_example():
+    driver = uc.Chrome(headless=True)
 
     logging.getLogger().setLevel(10)
 
