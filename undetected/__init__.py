@@ -874,10 +874,10 @@ def find_chrome_executable():
         for item in PATH.split(os.pathsep):
             for subitem in (
                 "google-chrome",
-                "chromium",
-                "chromium-browser",
                 "chrome",
                 "google-chrome-stable",
+                "chromium",
+                "chromium-browser",
             ):
                 candidates.add(os.sep.join((item, subitem)))
         if "darwin" in sys.platform:
