@@ -42,26 +42,28 @@ class Patcher(object):
 
     def __init__(
         self,
+        version_main,
         executable_path=None,
         force=False,
-        version_main: int | None = 0,
         user_multi_procs=False,
     ):
         """
         Args:
+            version_main:
+                specify main chrome version (rounded, ex: 82)
             executable_path: None = automatic
                              a full file path to the chromedriver executable
             force: False
                     terminate processes which are holding lock
-            version_main: 0 = auto
-                specify main chrome version (rounded, ex: 82)
         """
         self.force = force
         self._custom_exe_path = False
+
         prefix = secrets.token_hex(8)
+
         self.user_multi_procs = user_multi_procs
 
-        self.is_old_chromedriver = version_main and version_main <= 114
+        self.is_old_chromedriver = version_main <= 114
         # Needs to be called before self.exe_name is accessed
         self._set_platform_name()
 
@@ -117,7 +119,7 @@ class Patcher(object):
                 self.platform_name = "mac-x64"
             self.exe_name %= ""
 
-    def auto(self, executable_path=None, force=False, version_main=None, _=None):
+    def auto(self, executable_path=None, force=False, version_main=None):
         """
 
         Args:
@@ -165,6 +167,7 @@ class Patcher(object):
 
         if version_main:
             self.version_main = version_main
+
         if force is True:
             self.force = force
 
@@ -220,7 +223,6 @@ class Patcher(object):
                     exc.append(e)
 
                 if exc:
-
                     return True
                 return False
             # ok safe to assume this is in use
@@ -396,26 +398,19 @@ class Patcher(object):
         )
 
     def __del__(self):
-        if self._custom_exe_path:
-            # if the driver binary is specified by user
-            # we assume it is important enough to not delete it
-            return
-        else:
-            timeout = 3  # stop trying after this many seconds
+        if not self._custom_exe_path:
+            timeout = 3
+
             t = time.monotonic()
+            now = time.monotonic()
 
-            now = lambda: time.monotonic()
-
-            while now() - t > timeout:
-                # we don't want to wait until the end of time
+            while now - t > timeout:
                 try:
-                    if self.user_multi_procs:
-                        break
                     os.unlink(self.executable_path)
                     logger.debug("successfully unlinked %s" % self.executable_path)
                     break
                 except (OSError, RuntimeError, PermissionError):
                     time.sleep(0.01)
                     continue
-                except FileNotFoundError:
-                    break
+                except:
+                    raise
