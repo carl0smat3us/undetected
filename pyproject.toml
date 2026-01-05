@@ -29,7 +29,7 @@ pytest = "^9.0.2"
 taskipy = "^1.14.1"
 
 [tool.taskipy.tasks]
-lint = "black undetected/ && isort undetected/ && black example/ && isort example/"
+lint = "black undetected/ && isort undetected/ && black tests/ && isort tests/"
 
 [tool.poetry.urls]
 Issues = "https://github.com/carl0smat3us/undetected/issues"
