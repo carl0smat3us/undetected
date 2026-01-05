@@ -1,5 +1,4 @@
-#!/usr/bin/env python3
-# this module is part of undetected_chromedriver
+# this module is part of undetected
 
 import io
 import json
@@ -30,15 +29,15 @@ class Patcher(object):
 
     platform = sys.platform
     if platform.endswith("win32"):
-        d = "~/appdata/roaming/undetected_chromedriver"
+        d = "~/appdata/roaming/undetected"
     elif "LAMBDA_TASK_ROOT" in os.environ:
-        d = "/tmp/undetected_chromedriver"
+        d = "/tmp/undetected"
     elif platform.startswith(("linux", "linux2")):
-        d = "~/.local/share/undetected_chromedriver"
+        d = "~/.local/share/undetected"
     elif platform.endswith("darwin"):
-        d = "~/Library/Application Support/undetected_chromedriver"
+        d = "~/Library/Application Support/undetected"
     else:
-        d = "~/.undetected_chromedriver"
+        d = "~/.undetected"
     data_path = os.path.abspath(os.path.expanduser(d))
 
     def __init__(
@@ -102,7 +101,7 @@ class Patcher(object):
 
     def _set_platform_name(self):
         """
-        Set the platform and exe name based on the platform undetected_chromedriver is running on
+        Set the platform and exe name based on the platform undetected is running on
         in order to download the correct chromedriver.
         """
         if self.platform.endswith("win32"):
@@ -404,7 +403,9 @@ class Patcher(object):
         else:
             timeout = 3  # stop trying after this many seconds
             t = time.monotonic()
+
             now = lambda: time.monotonic()
+
             while now() - t > timeout:
                 # we don't want to wait until the end of time
                 try:

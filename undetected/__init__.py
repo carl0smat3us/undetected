@@ -196,7 +196,7 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
 
               unfortunately, there  is always an edge case in which one would like to write an single script with the only contents being:
               --start script--
-              import undetected_chromedriver as uc
+              import undetected as uc
               d = uc.Chrome()
               d.get('https://somesite/')
               ---end script --
@@ -213,7 +213,7 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
         user_multi_procs:
             set to true when you are using multithreads/multiprocessing
             ensures not all processes are trying to modify a binary which is in use by another.
-            for this to work. YOU MUST HAVE AT LEAST 1 UNDETECTED_CHROMEDRIVER BINARY IN YOUR ROAMING DATA FOLDER.
+            for this to work. YOU MUST HAVE AT LEAST 1 UNDETECTED BINARY IN YOUR ROAMING DATA FOLDER.
             this requirement can be easily satisfied, by just running this program "normal" and close/kill it.
 
 
@@ -280,6 +280,8 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
             if "lang" in arg:
                 m = re.search("(?:--)?lang(?:[ =])?(.*)", arg)
                 try:
+                    if not m:
+                        raise IndexError
                     language = m[1]
                 except IndexError:
                     logger.debug("will set the language to en-US,en;q=0.9")
@@ -287,14 +289,13 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
 
             if "user-data-dir" in arg:
                 m = re.search("(?:--)?user-data-dir(?:[ =])?(.*)", arg)
-                try:
+                if m:
                     user_data_dir = m[1]
                     logger.debug(
                         "user-data-dir found in user argument %s => %s" % (arg, m[1])
                     )
                     keep_user_data_dir = True
-
-                except IndexError:
+                else:
                     logger.debug(
                         "no user data dir could be extracted from supplied argument %s "
                         % arg
@@ -385,9 +386,9 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
         if headless or getattr(options, "headless", None):
             # workaround until a better checking is found
             try:
-                if self.patcher.version_main < 108:
+                if self.patcher.version_main and self.patcher.version_main < 108:
                     options.add_argument("--headless=chrome")
-                elif self.patcher.version_main >= 108:
+                elif self.patcher.version_main and self.patcher.version_main >= 108:
                     options.add_argument("--headless=new")
             except:
                 logger.warning(
@@ -411,22 +412,30 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
             options.handle_prefs(user_data_dir)
 
         # fix exit_type flag to prevent tab-restore nag
-        try:
-            with open(
-                os.path.join(user_data_dir, "Default/Preferences"),
-                encoding="latin1",
-                mode="r+",
-            ) as fs:
-                config = json.load(fs)
-                if config["profile"]["exit_type"] is not None:
-                    # fixing the restore-tabs-nag
-                    config["profile"]["exit_type"] = None
-                fs.seek(0, 0)
-                json.dump(config, fs)
-                fs.truncate()  # the file might be shorter
-                logger.debug("fixed exit_type flag")
-        except Exception:
-            logger.debug("did not find a bad exit_type flag ")
+
+        default_profile = None
+
+        if user_data_dir:
+            default_profile = os.path.join(user_data_dir, "Default/Preferences")
+
+            try:
+                with open(
+                    default_profile,
+                    encoding="latin1",
+                    mode="r+",
+                ) as fs:
+                    config = json.load(fs)
+                    if config["profile"]["exit_type"] is not None:
+                        # fixing the restore-tabs-nag
+                        config["profile"]["exit_type"] = None
+                    fs.seek(0, 0)
+                    json.dump(config, fs)
+                    fs.truncate()  # the file might be shorter
+                    logger.debug("fixed exit_type flag")
+            except Exception:
+                logger.debug("did not find a bad exit_type flag ")
+        else:
+            logger.debug("did not find default profile")
 
         self.options = options
 

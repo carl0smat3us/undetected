@@ -1,7 +1,6 @@
 from typing import List
 
 import selenium.webdriver.remote.webelement
-from selenium.webdriver.common.by import By
 
 
 class WebElement(selenium.webdriver.remote.webelement.WebElement):
@@ -46,11 +45,11 @@ class UCWebElement(WebElement):
         if not self._attrs:
             self._attrs = self._parent.execute_script(
                 """
-                var items = {}; 
-                for (index = 0; index < arguments[0].attributes.length; ++index) 
+                var items = {};
+                for (index = 0; index < arguments[0].attributes.length; ++index)
                 {
-                 items[arguments[0].attributes[index].name] = arguments[0].attributes[index].value 
-                }; 
+                 items[arguments[0].attributes[index].name] = arguments[0].attributes[index].value
+                };
                 return items;
                 """,
                 self,
