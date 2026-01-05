@@ -1,5 +1,4 @@
 import base64
-import logging
 import os
 from pathlib import Path
 
@@ -20,8 +19,6 @@ tmp_path.mkdir(parents=True, exist_ok=True)
 
 def test_example():
     driver = uc.Chrome(headless=True)
-
-    logging.getLogger().setLevel(10)
 
     driver.get("chrome://version")
     driver.save_screenshot(tmp_path / "versioninfo.png")
