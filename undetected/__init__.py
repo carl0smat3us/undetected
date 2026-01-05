@@ -91,7 +91,6 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
         keep_alive=True,
         log_level=0,
         headless=False,
-        version_main: int | None = None,
         patcher_force_close=False,
         suppress_welcome=True,
         use_subprocess=True,
@@ -170,11 +169,6 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
             Specify whether you want to use the browser in headless mode.
             warning: this lowers undetectability and not fully supported.
 
-        version_main: int, optional, default: None (=auto)
-            if you, for god knows whatever reason, use
-            an older version of Chrome. You can specify it's full rounded version number
-            here. Example: 87 for all versions of 87
-
         patcher_force_close: bool, optional, default: False
             instructs the patcher to do whatever it can to access the chromedriver binary
             if the file is locked, it will force shutdown all instances.
@@ -196,7 +190,7 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
 
               unfortunately, there  is always an edge case in which one would like to write an single script with the only contents being:
               --start script--
-              import undetected_chromedriver as uc
+              import undetected as uc
               d = uc.Chrome()
               d.get('https://somesite/')
               ---end script --
@@ -213,20 +207,39 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
         user_multi_procs:
             set to true when you are using multithreads/multiprocessing
             ensures not all processes are trying to modify a binary which is in use by another.
-            for this to work. YOU MUST HAVE AT LEAST 1 UNDETECTED_CHROMEDRIVER BINARY IN YOUR ROAMING DATA FOLDER.
+            for this to work. YOU MUST HAVE AT LEAST 1 UNDETECTED BINARY IN YOUR ROAMING DATA FOLDER.
             this requirement can be easily satisfied, by just running this program "normal" and close/kill it.
 
 
         """
 
         finalize(self, self._ensure_close, self)
+
+        if not browser_executable_path:
+            browser_executable_path = find_chrome_executable()
+
+        if (
+            not browser_executable_path
+            or not pathlib.Path(browser_executable_path).exists()
+        ):
+            raise FileNotFoundError("Could not determine browser executable.")
+
+        version_main = get_chrome_version(browser_executable_path)
+
+        if not version_main:
+            raise ValueError("Could not determine browser version.")
+
+        version_main = int(version_main.split(".")[0])
+
         self.debug = debug
+
         self.patcher = Patcher(
+            version_main=version_main,
             executable_path=driver_executable_path,
             force=patcher_force_close,
-            version_main=version_main,
             user_multi_procs=user_multi_procs,
         )
+
         # self.patcher.auto(user_multiprocess = user_multi_num_procs)
         self.patcher.auto()
 
@@ -280,6 +293,8 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
             if "lang" in arg:
                 m = re.search("(?:--)?lang(?:[ =])?(.*)", arg)
                 try:
+                    if not m:
+                        raise IndexError
                     language = m[1]
                 except IndexError:
                     logger.debug("will set the language to en-US,en;q=0.9")
@@ -287,14 +302,13 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
 
             if "user-data-dir" in arg:
                 m = re.search("(?:--)?user-data-dir(?:[ =])?(.*)", arg)
-                try:
+                if m:
                     user_data_dir = m[1]
                     logger.debug(
                         "user-data-dir found in user argument %s => %s" % (arg, m[1])
                     )
                     keep_user_data_dir = True
-
-                except IndexError:
+                else:
                     logger.debug(
                         "no user data dir could be extracted from supplied argument %s "
                         % arg
@@ -347,30 +361,7 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
 
         options.add_argument("--lang=%s" % language)
 
-        if not options.binary_location:
-            if browser_executable_path:
-                options.binary_location = browser_executable_path
-            else:
-                chrome_executable = find_chrome_executable()
-                if chrome_executable:
-                    options.binary_location = chrome_executable
-
-        if (
-            not options.binary_location
-            or not pathlib.Path(options.binary_location).exists()
-        ):
-            raise FileNotFoundError(
-                "\n---------------------\n"
-                "Could not determine browser executable."
-                "\n---------------------\n"
-                "Make sure your browser is installed in the default location (path).\n"
-                "If you are sure about the browser executable, you can specify it using\n"
-                "the `browser_executable_path='{}` parameter.\n\n".format(
-                    "/path/to/browser/executable"
-                    if IS_POSIX
-                    else "c:/path/to/your/browser.exe"
-                )
-            )
+        options.binary_location = browser_executable_path
 
         self._delay = 3
 
@@ -385,9 +376,9 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
         if headless or getattr(options, "headless", None):
             # workaround until a better checking is found
             try:
-                if self.patcher.version_main < 108:
+                if self.patcher.version_main and self.patcher.version_main < 108:
                     options.add_argument("--headless=chrome")
-                elif self.patcher.version_main >= 108:
+                elif self.patcher.version_main and self.patcher.version_main >= 108:
                     options.add_argument("--headless=new")
             except:
                 logger.warning(
@@ -411,22 +402,30 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
             options.handle_prefs(user_data_dir)
 
         # fix exit_type flag to prevent tab-restore nag
-        try:
-            with open(
-                os.path.join(user_data_dir, "Default/Preferences"),
-                encoding="latin1",
-                mode="r+",
-            ) as fs:
-                config = json.load(fs)
-                if config["profile"]["exit_type"] is not None:
-                    # fixing the restore-tabs-nag
-                    config["profile"]["exit_type"] = None
-                fs.seek(0, 0)
-                json.dump(config, fs)
-                fs.truncate()  # the file might be shorter
-                logger.debug("fixed exit_type flag")
-        except Exception:
-            logger.debug("did not find a bad exit_type flag ")
+
+        default_profile = None
+
+        if user_data_dir:
+            default_profile = os.path.join(user_data_dir, "Default/Preferences")
+
+            try:
+                with open(
+                    default_profile,
+                    encoding="latin1",
+                    mode="r+",
+                ) as fs:
+                    config = json.load(fs)
+                    if config["profile"]["exit_type"] is not None:
+                        # fixing the restore-tabs-nag
+                        config["profile"]["exit_type"] = None
+                    fs.seek(0, 0)
+                    json.dump(config, fs)
+                    fs.truncate()  # the file might be shorter
+                    logger.debug("fixed exit_type flag")
+            except Exception:
+                logger.debug("did not find a bad exit_type flag ")
+        else:
+            logger.debug("did not find default profile")
 
         self.options = options
 
@@ -849,46 +848,94 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
 
 def find_chrome_executable():
     """
-    Finds the chrome, chrome beta, chrome canary, chromium executable
+    Finds Google Chrome (stable/beta/canary) first, then Chromium.
 
     Returns
     -------
-    executable_path :  str
-        the full file path to found executable
-
+    executable_path : str | None
+        Full path to the browser executable, or None if not found.
     """
-    candidates = set()
+
+    candidates = []
 
     PATH = os.environ.get("PATH")
 
+    # -------- POSIX (Linux / macOS) --------
     if IS_POSIX and PATH:
-        for item in PATH.split(os.pathsep):
-            for subitem in (
-                "google-chrome",
-                "chromium",
-                "chromium-browser",
-                "chrome",
-                "google-chrome-stable",
-            ):
-                candidates.add(os.sep.join((item, subitem)))
-        if "darwin" in sys.platform:
-            candidates.update(
+        # Priority order
+        binaries = [
+            "google-chrome",
+            "google-chrome-stable",
+            "google-chrome-beta",
+            "google-chrome-canary",
+            "chrome",
+            "chromium",
+            "chromium-browser",
+        ]
+
+        for path_dir in PATH.split(os.pathsep):
+            for binary in binaries:
+                candidates.append(os.path.join(path_dir, binary))
+
+        # macOS .app paths
+        if sys.platform == "darwin":
+            candidates.extend(
                 [
                     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
                     "/Applications/Chromium.app/Contents/MacOS/Chromium",
                 ]
             )
-    else:
-        for item in map(
-            os.environ.get,
-            ("PROGRAMFILES", "PROGRAMFILES(X86)", "LOCALAPPDATA", "PROGRAMW6432"),
-        ):
-            if item is not None:
-                for subitem in ("Google/Chrome/Application", "Chromium/Application"):
-                    candidates.add(os.sep.join((item, subitem, "chrome.exe")))
 
+    # -------- Windows --------
+    else:
+        install_roots = (
+            "PROGRAMFILES",
+            "PROGRAMFILES(X86)",
+            "LOCALAPPDATA",
+            "PROGRAMW6432",
+        )
+
+        # Priority order (Chrome FIRST)
+        subpaths = (
+            "Google/Chrome/Application/chrome.exe",
+            "Chromium/Application/chrome.exe",
+        )
+
+        for root in map(os.environ.get, install_roots):
+            if root:
+                for subpath in subpaths:
+                    candidates.append(os.path.join(root, subpath))
+
+    # -------- Check existence --------
     for candidate in candidates:
-        logger.debug("checking if %s exists and is executable" % candidate)
         if os.path.exists(candidate) and os.access(candidate, os.X_OK):
-            logger.debug("found! using %s" % candidate)
             return os.path.normpath(candidate)
+
+    return None
+
+
+def get_chrome_version(exe_path):
+    if not exe_path:
+        return None
+
+    try:
+        if sys.platform != "win32":
+            command = [exe_path, "--version"]
+        else:
+            command = [
+                "powershell",
+                "-Command",
+                f"& {{(Get-Item '{exe_path}').VersionInfo.FileVersion}}",
+            ]
+
+        output = subprocess.check_output(
+            command,
+            stderr=subprocess.DEVNULL,
+            text=True,
+        )
+
+        match = re.search(r"\d+\.\d+\.\d+\.\d+", output)
+        return match.group(0) if match else None
+
+    except (subprocess.SubprocessError, OSError):
+        return None
