@@ -858,46 +858,67 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
 
 def find_chrome_executable():
     """
-    Finds the chrome, chrome beta, chrome canary, chromium executable
+    Finds Google Chrome (stable/beta/canary) first, then Chromium.
 
     Returns
     -------
-    executable_path :  str
-        the full file path to found executable
-
+    executable_path : str | None
+        Full path to the browser executable, or None if not found.
     """
-    candidates = set()
+
+    candidates = []
 
     PATH = os.environ.get("PATH")
 
+    # -------- POSIX (Linux / macOS) --------
     if IS_POSIX and PATH:
-        for item in PATH.split(os.pathsep):
-            for subitem in (
-                "google-chrome",
-                "chrome",
-                "google-chrome-stable",
-                "chromium",
-                "chromium-browser",
-            ):
-                candidates.add(os.sep.join((item, subitem)))
-        if "darwin" in sys.platform:
-            candidates.update(
+        # Priority order
+        binaries = [
+            "google-chrome",
+            "google-chrome-stable",
+            "google-chrome-beta",
+            "google-chrome-canary",
+            "chrome",
+            "chromium",
+            "chromium-browser",
+        ]
+
+        for path_dir in PATH.split(os.pathsep):
+            for binary in binaries:
+                candidates.append(os.path.join(path_dir, binary))
+
+        # macOS .app paths
+        if sys.platform == "darwin":
+            candidates.extend(
                 [
                     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
                     "/Applications/Chromium.app/Contents/MacOS/Chromium",
                 ]
             )
-    else:
-        for item in map(
-            os.environ.get,
-            ("PROGRAMFILES", "PROGRAMFILES(X86)", "LOCALAPPDATA", "PROGRAMW6432"),
-        ):
-            if item is not None:
-                for subitem in ("Google/Chrome/Application", "Chromium/Application"):
-                    candidates.add(os.sep.join((item, subitem, "chrome.exe")))
 
+    # -------- Windows --------
+    else:
+        install_roots = (
+            "PROGRAMFILES",
+            "PROGRAMFILES(X86)",
+            "LOCALAPPDATA",
+            "PROGRAMW6432",
+        )
+
+        # Priority order (Chrome FIRST)
+        subpaths = (
+            "Google/Chrome/Application/chrome.exe",
+            "Chromium/Application/chrome.exe",
+        )
+
+        for root in map(os.environ.get, install_roots):
+            if root:
+                for subpath in subpaths:
+                    candidates.append(os.path.join(root, subpath))
+
+    # -------- Check existence --------
     for candidate in candidates:
-        logger.debug("checking if %s exists and is executable" % candidate)
         if os.path.exists(candidate) and os.access(candidate, os.X_OK):
-            logger.debug("found! using %s" % candidate)
             return os.path.normpath(candidate)
+
+    return None
