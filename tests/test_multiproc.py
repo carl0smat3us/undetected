@@ -24,7 +24,7 @@ def worker(idx: int, result_queue):
 def test_multiproc():
     process_count = 4
 
-    uc.init()
+    Patcher.patch()
 
     ctx = mp.get_context("spawn")
     result_queue = ctx.Queue()
@@ -48,6 +48,7 @@ def test_multiproc():
             print(f"[Process {idx}] FAILED: {err}")
 
     assert not failures, f"{len(failures)} process(es) failed"
+
 
 
 def test_multiproc_without_init():
@@ -79,4 +80,4 @@ def test_multiproc_without_init():
     assert len(failures) == 4, "All processes succeeded"
 
     for _, _, err in failures:
-        assert "initialize chromedriver first" in err
+        assert "must initialize" in err

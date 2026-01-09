@@ -18,12 +18,12 @@ from urllib.request import urlopen, urlretrieve
 
 from packaging.version import Version
 
+from utils.info import IS_POSIX, get_browser_info
+
 logger = logging.getLogger(__name__)
 
-IS_POSIX = sys.platform.startswith(("darwin", "cygwin", "linux", "linux2"))
 
-
-class Patcher(object):
+class Patcher:
     lock = Lock()
     exe_name = "chromedriver%s"
 
@@ -47,6 +47,7 @@ class Patcher(object):
         driver_executable_path=None,
         force=False,
         user_multi_procs=False,
+        for_patch=False,
     ):
         """
         Args:
@@ -56,8 +57,12 @@ class Patcher(object):
                              a full file path to the chromedriver executable
             force: False
                     terminate processes which are holding lock
+            for_patch: False
+                    rather the class is only being used to call the method `patch` or not
+
         """
         self.force = force
+        self.for_patch = for_patch
         self._using_custom_exe = False
 
         prefix = secrets.token_hex(8)
@@ -83,11 +88,10 @@ class Patcher(object):
 
         self.zip_path = os.path.join(self.data_path, prefix)
 
-        if not driver_executable_path:
-            if not self.user_multi_procs:
-                self.driver_executable_path = os.path.abspath(
-                    os.path.join(".", self.driver_executable_path)
-                )
+        if not driver_executable_path and not self.user_multi_procs:
+            self.driver_executable_path = os.path.abspath(
+                os.path.join(".", self.driver_executable_path)
+            )
 
         if driver_executable_path:
             self._using_custom_exe = True
@@ -120,83 +124,39 @@ class Patcher(object):
                 self.platform_name = "mac-x64"
             self.exe_name %= ""
 
-    def auto(self, driver_executable_path=None, force=False, version_main=None):
+    def verify(self):
         """
-
-        Args:
-            driver_executable_path:
-            force:
-            version_main:
-
-        Returns:
-
+        Verify if the binary is patched.
         """
         p = pathlib.Path(self.data_path)
 
-        # use the most recent chromedriver when in multiprocessing mode
-        if self.user_multi_procs:
-            with self.lock:
-                files = list(p.glob("*chromedriver*"))
+        with self.lock:
+            files = list(p.glob("*chromedriver*"))
 
-                if not files:
-                    raise Exception(
-                        """
-                        You must initialize chromedriver first before using multiprocessing mode.
+            if not files:
+                raise Exception(
+                    """
+                    No undetected chromedriver binary were found.
 
-                        Call `undetected.init()` outside of multiprocessing/threading implementation to initialize it.
-                        """
-                    )
-
-                try:
-                    most_recent = max(files, key=lambda f: f.stat().st_mtime)
-                except ValueError:
-                    return False
-
-                for f in files:
-                    if f != most_recent:
-                        try:
-                            f.unlink()
-                        except FileNotFoundError:
-                            pass
-
-                if self.is_binary_patched(most_recent):
-                    self.driver_executable_path = str(most_recent)
-                    return True
-
-        if driver_executable_path:
-            self.driver_executable_path = driver_executable_path
-            self._using_custom_exe = True
-
-        if self._using_custom_exe:
-            ispatched = self.is_binary_patched(self.driver_executable_path)
-            if not ispatched:
-                return self.patch_exe()
-            else:
-                return
-
-        if version_main:
-            self.version_main = version_main
-
-        if force is True:
-            self.force = force
-
-        try:
-            os.unlink(self.driver_executable_path)
-        except PermissionError:
-            if self.force:
-                self.force_kill_instances(self.driver_executable_path)
-                return self.auto(force=not self.force)
+                    Call `Patcher.patch()` outside of multiprocessing/threading implementation.
+                    """
+                )
 
             try:
-                # assumes already running AND patched
-                if self.is_binary_patched():
-                    return True
-            except PermissionError:
-                pass
-        except FileNotFoundError:
-            pass
+                most_recent = max(files, key=lambda f: f.stat().st_mtime)
+            except ValueError:
+                return False
 
-        self.download_and_patch()
+            for f in files:
+                if f != most_recent:
+                    try:
+                        f.unlink()
+                    except FileNotFoundError:
+                        pass
+
+            if self.is_binary_patched(most_recent):
+                self.driver_executable_path = str(most_recent)
+                return True
 
     def download_and_patch(self):
         release = self.fetch_release_number()
@@ -205,7 +165,9 @@ class Patcher(object):
         self.version_full = release
 
         self.unzip_package(self.fetch_package())
-        return self.patch()
+        self.patch_exe()
+
+        return self.is_binary_patched()
 
     def driver_binary_in_use(self, path: str | None = None) -> bool | None:
         """
@@ -255,10 +217,6 @@ class Patcher(object):
                 item.unlink()
             except OSError:
                 pass
-
-    def patch(self):
-        self.patch_exe()
-        return self.is_binary_patched()
 
     def fetch_release_number(self):
         """
@@ -409,6 +367,18 @@ class Patcher(object):
             "patching took us {:.2f} seconds".format(time.perf_counter() - start)
         )
 
+    @staticmethod
+    def patch(browser_executable_path=None, driver_executable_path=None):
+        patcher = Patcher(
+            version_main=get_browser_info(browser_executable_path)[
+                "browser_major_version"
+            ],
+            driver_executable_path=driver_executable_path,
+            for_patch=True,
+        )
+        patcher.cleanup_unused_files()
+        patcher.download_and_patch()
+
     def __repr__(self):
         return "{0:s}({1:s})".format(
             self.__class__.__name__,
@@ -416,21 +386,26 @@ class Patcher(object):
         )
 
     def __del__(self):
-        if not self._using_custom_exe:
-            timeout = 3
+        if (
+            not self._using_custom_exe
+            and not self.for_patch
+            and not self.user_multi_procs
+        ):
+            max_attempts = 30  # try for ~3 seconds if sleep=0.1
+            sleep_time = 0.1
 
-            t = time.monotonic()
-            now = time.monotonic()
-
-            while now - t > timeout:
+            for _ in range(max_attempts):
                 try:
                     os.unlink(self.driver_executable_path)
                     logger.debug(
-                        "successfully unlinked %s" % self.driver_executable_path
+                        "successfully unlinked %s", self.driver_executable_path
                     )
                     break
-                except (OSError, RuntimeError, PermissionError):
-                    time.sleep(0.01)
-                    continue
-                except:
-                    raise
+                except (PermissionError, OSError):
+                    time.sleep(sleep_time)
+            else:
+                logger.warning(
+                    "could not unlink %s after %d attempts",
+                    self.driver_executable_path,
+                    max_attempts,
+                )
