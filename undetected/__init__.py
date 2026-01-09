@@ -207,40 +207,27 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
         user_multi_procs:
             set to true when you are using multithreads/multiprocessing
             ensures not all processes are trying to modify a binary which is in use by another.
-            for this to work. YOU MUST HAVE AT LEAST 1 UNDETECTED BINARY IN YOUR ROAMING DATA FOLDER.
+            for this to work.
+
+            YOU SHOULD CALL THE METHOD 'init' TO ENSURE THAT YOU HAVE AT LEAST ONE CHROMEDRIVER BINNARY AVAILABLE.
             this requirement can be easily satisfied, by just running this program "normal" and close/kill it.
-
-
         """
 
         finalize(self, self._ensure_close, self)
 
-        if not browser_executable_path:
-            browser_executable_path = find_chrome_executable()
-
-        if (
-            not browser_executable_path
-            or not pathlib.Path(browser_executable_path).exists()
-        ):
-            raise FileNotFoundError("Could not determine browser executable.")
-
-        version_main = get_chrome_version(browser_executable_path)
-
-        if not version_main:
-            raise ValueError("Could not determine browser version.")
-
-        version_main = int(version_main.split(".")[0])
+        browser_info = get_browser_info(browser_executable_path=browser_executable_path)
+        browser_executable_path = browser_info["browser_path"]
+        browser_major_version = browser_info["browser_major_version"]
 
         self.debug = debug
 
         self.patcher = Patcher(
-            version_main=version_main,
-            executable_path=driver_executable_path,
+            version_main=browser_major_version,
+            driver_executable_path=driver_executable_path,
             force=patcher_force_close,
             user_multi_procs=user_multi_procs,
         )
 
-        # self.patcher.auto(user_multiprocess = user_multi_num_procs)
         self.patcher.auto()
 
         # self.patcher = patcher
@@ -393,10 +380,7 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
         # fixes "could not connect to chrome" error when running
         # on linux using privileged user like root (which i don't recommend)
 
-        options.add_argument(
-            "--log-level=%d" % log_level
-            or divmod(logging.getLogger().getEffectiveLevel(), 10)[0]
-        )
+        options.add_argument("--log-level=%d" % log_level)
 
         if hasattr(options, "handle_prefs"):
             options.handle_prefs(user_data_dir)
@@ -447,7 +431,7 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
             self.browser_pid = browser.pid
 
         service = selenium.webdriver.chromium.service.ChromiumService(
-            self.patcher.executable_path
+            self.patcher.driver_executable_path
         )
 
         super(Chrome, self).__init__(
@@ -939,3 +923,46 @@ def get_chrome_version(exe_path):
 
     except (subprocess.SubprocessError, OSError):
         return None
+
+
+def get_chrome_major_version(exe_path: str):
+    version = get_chrome_version(exe_path)
+
+    if not version:
+        raise ValueError("Could not determine browser version.")
+
+    return int(version.split(".")[0])
+
+
+def get_browser_info(browser_executable_path: str | None = None):
+    if not browser_executable_path:
+        browser_executable_path = find_chrome_executable()
+
+    if (
+        not browser_executable_path
+        or not pathlib.Path(browser_executable_path).exists()
+    ):
+        raise FileNotFoundError("Could not determine browser executable.")
+
+    version = get_chrome_version(browser_executable_path)
+
+    if not version:
+        raise ValueError("Could not determine browser version.")
+
+    return {
+        "browser_path": browser_executable_path,
+        "browser_major_version": get_chrome_major_version(browser_executable_path),
+    }
+
+
+def init(browser_executable_path=None, driver_executable_path=None):
+    """
+    This function must be called once before starting threads or processes,
+    so all workers can reuse the same patched driver.
+    """
+    patcher = Patcher(
+        version_main=get_browser_info(browser_executable_path)["browser_major_version"],
+        driver_executable_path=driver_executable_path,
+    )
+    # patcher.cleanup_unused_files()
+    patcher.download_and_patch()
