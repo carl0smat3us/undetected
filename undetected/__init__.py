@@ -1,11 +1,9 @@
 import json
 import logging
 import os
-import pathlib
 import re
 import shutil
 import subprocess
-import sys
 import tempfile
 import time
 from weakref import finalize
@@ -14,21 +12,16 @@ import selenium.webdriver.chrome.webdriver
 import selenium.webdriver.chromium.service
 import selenium.webdriver.remote.command
 
+from utils.info import IS_POSIX, get_browser_info
+
 from .cdp import CDP
 from .dprocess import start_detached
 from .options import ChromeOptions
-from .patcher import IS_POSIX, Patcher
+from .patcher import Patcher
 from .reactor import Reactor
 from .webelement import UCWebElement, WebElement
 
-__all__ = (
-    "Chrome",
-    "ChromeOptions",
-    "Patcher",
-    "Reactor",
-    "CDP",
-    "find_chrome_executable",
-)
+__all__ = ("Chrome", "ChromeOptions", "Patcher", "Reactor", "CDP")
 
 logger = logging.getLogger("uc")
 logger.setLevel(logging.getLogger().getEffectiveLevel())
@@ -228,7 +221,10 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
             user_multi_procs=user_multi_procs,
         )
 
-        self.patcher.auto()
+        if not user_multi_procs:
+            self.patcher.patch()
+
+        self.patcher.verify()
 
         # self.patcher = patcher
         if not options:
@@ -828,141 +824,3 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
             and hasattr(self.service.process, "kill")
         ):
             self.service.process.kill()
-
-
-def find_chrome_executable():
-    """
-    Finds Google Chrome (stable/beta/canary) first, then Chromium.
-
-    Returns
-    -------
-    executable_path : str | None
-        Full path to the browser executable, or None if not found.
-    """
-
-    candidates = []
-
-    PATH = os.environ.get("PATH")
-
-    # -------- POSIX (Linux / macOS) --------
-    if IS_POSIX and PATH:
-        # Priority order
-        binaries = [
-            "google-chrome",
-            "google-chrome-stable",
-            "google-chrome-beta",
-            "google-chrome-canary",
-            "chrome",
-            "chromium",
-            "chromium-browser",
-        ]
-
-        for path_dir in PATH.split(os.pathsep):
-            for binary in binaries:
-                candidates.append(os.path.join(path_dir, binary))
-
-        # macOS .app paths
-        if sys.platform == "darwin":
-            candidates.extend(
-                [
-                    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-                    "/Applications/Chromium.app/Contents/MacOS/Chromium",
-                ]
-            )
-
-    # -------- Windows --------
-    else:
-        install_roots = (
-            "PROGRAMFILES",
-            "PROGRAMFILES(X86)",
-            "LOCALAPPDATA",
-            "PROGRAMW6432",
-        )
-
-        # Priority order (Chrome FIRST)
-        subpaths = (
-            "Google/Chrome/Application/chrome.exe",
-            "Chromium/Application/chrome.exe",
-        )
-
-        for root in map(os.environ.get, install_roots):
-            if root:
-                for subpath in subpaths:
-                    candidates.append(os.path.join(root, subpath))
-
-    # -------- Check existence --------
-    for candidate in candidates:
-        if os.path.exists(candidate) and os.access(candidate, os.X_OK):
-            return os.path.normpath(candidate)
-
-    return None
-
-
-def get_chrome_version(exe_path):
-    if not exe_path:
-        return None
-
-    try:
-        if sys.platform != "win32":
-            command = [exe_path, "--version"]
-        else:
-            command = [
-                "powershell",
-                "-Command",
-                f"& {{(Get-Item '{exe_path}').VersionInfo.FileVersion}}",
-            ]
-
-        output = subprocess.check_output(
-            command,
-            stderr=subprocess.DEVNULL,
-            text=True,
-        )
-
-        match = re.search(r"\d+\.\d+\.\d+\.\d+", output)
-        return match.group(0) if match else None
-
-    except (subprocess.SubprocessError, OSError):
-        return None
-
-
-def get_chrome_major_version(exe_path: str):
-    version = get_chrome_version(exe_path)
-
-    if not version:
-        raise ValueError("Could not determine browser version.")
-
-    return int(version.split(".")[0])
-
-
-def get_browser_info(browser_executable_path: str | None = None):
-    if not browser_executable_path:
-        browser_executable_path = find_chrome_executable()
-
-    if (
-        not browser_executable_path
-        or not pathlib.Path(browser_executable_path).exists()
-    ):
-        raise FileNotFoundError("Could not determine browser executable.")
-
-    version = get_chrome_version(browser_executable_path)
-
-    if not version:
-        raise ValueError("Could not determine browser version.")
-
-    return {
-        "browser_path": browser_executable_path,
-        "browser_major_version": get_chrome_major_version(browser_executable_path),
-    }
-
-
-def init(browser_executable_path=None, driver_executable_path=None):
-    """
-    This function must be called once before starting threads or processes,
-    so all workers can reuse the same patched driver.
-    """
-    patcher = Patcher(
-        version_main=get_browser_info(browser_executable_path)["browser_major_version"],
-        driver_executable_path=driver_executable_path,
-    )
-    # patcher.cleanup_unused_files()
-    patcher.download_and_patch()
