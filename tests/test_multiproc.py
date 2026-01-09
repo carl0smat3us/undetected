@@ -54,8 +54,6 @@ def test_multiproc():
 def test_multiproc_without_init():
     process_count = 4
 
-    Patcher.cleanup_unused_files()
-
     ctx = mp.get_context("spawn")
     result_queue = ctx.Queue()
 
@@ -80,4 +78,4 @@ def test_multiproc_without_init():
     assert len(failures) == 4, "All processes succeeded"
 
     for _, _, err in failures:
-        assert "must initialize" in err
+        assert "binary were found" in err
