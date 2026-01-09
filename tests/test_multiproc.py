@@ -1,5 +1,6 @@
 import multiprocessing as mp
 
+from tests import logger
 import undetected as uc
 from undetected.patcher import Patcher
 
@@ -45,14 +46,13 @@ def test_multiproc():
 
     if failures:
         for idx, _, err in failures:
-            print(f"[Process {idx}] FAILED: {err}")
+            logger.debug(f"[Process {idx}] FAILED: {err}")
 
     assert not failures, f"{len(failures)} process(es) failed"
 
-
-
 def test_multiproc_without_init():
     process_count = 4
+
 
     ctx = mp.get_context("spawn")
     result_queue = ctx.Queue()
@@ -73,7 +73,7 @@ def test_multiproc_without_init():
 
     if failures:
         for idx, _, err in failures:
-            print(f"[Process {idx}] FAILED: {err}")
+            logger.debug(f"TEST: [Process {idx}] FAILED: {err}")
 
     assert len(failures) == 4, "All processes succeeded"
 
