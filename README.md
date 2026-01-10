@@ -4,6 +4,10 @@ Undetectable selenium chromedriver.
 
 **Note:** This project is a fork of [`undetected-chromedriver`](https://github.com/ultrafunkamsterdam/undetected-chromedriver).
 
+```bash
+pip install undetected
+```
+
 Simple usage:
 
 ```python
@@ -34,3 +38,4 @@ if __name__ == "__main__":
     for p in processes:
         p.join()
 ```
+
