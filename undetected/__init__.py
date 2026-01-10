@@ -1,11 +1,9 @@
 import json
 import logging
 import os
-import pathlib
 import re
 import shutil
 import subprocess
-import sys
 import tempfile
 import time
 from weakref import finalize
@@ -17,18 +15,12 @@ import selenium.webdriver.remote.command
 from .cdp import CDP
 from .dprocess import start_detached
 from .options import ChromeOptions
-from .patcher import IS_POSIX, Patcher
+from .patcher import Patcher
 from .reactor import Reactor
+from .utils.info import IS_POSIX, get_browser_info
 from .webelement import UCWebElement, WebElement
 
-__all__ = (
-    "Chrome",
-    "ChromeOptions",
-    "Patcher",
-    "Reactor",
-    "CDP",
-    "find_chrome_executable",
-)
+__all__ = ("Chrome", "ChromeOptions", "Patcher", "Reactor", "CDP")
 
 logger = logging.getLogger("uc")
 logger.setLevel(logging.getLogger().getEffectiveLevel())
@@ -207,41 +199,31 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
         user_multi_procs:
             set to true when you are using multithreads/multiprocessing
             ensures not all processes are trying to modify a binary which is in use by another.
-            for this to work. YOU MUST HAVE AT LEAST 1 UNDETECTED BINARY IN YOUR ROAMING DATA FOLDER.
+            for this to work.
+
+            YOU SHOULD CALL THE METHOD 'init' TO ENSURE THAT YOU HAVE AT LEAST ONE CHROMEDRIVER BINNARY AVAILABLE.
             this requirement can be easily satisfied, by just running this program "normal" and close/kill it.
-
-
         """
 
         finalize(self, self._ensure_close, self)
 
-        if not browser_executable_path:
-            browser_executable_path = find_chrome_executable()
-
-        if (
-            not browser_executable_path
-            or not pathlib.Path(browser_executable_path).exists()
-        ):
-            raise FileNotFoundError("Could not determine browser executable.")
-
-        version_main = get_chrome_version(browser_executable_path)
-
-        if not version_main:
-            raise ValueError("Could not determine browser version.")
-
-        version_main = int(version_main.split(".")[0])
+        browser_info = get_browser_info(browser_executable_path=browser_executable_path)
+        browser_executable_path = browser_info["browser_path"]
+        browser_major_version = browser_info["browser_major_version"]
 
         self.debug = debug
 
         self.patcher = Patcher(
-            version_main=version_main,
-            executable_path=driver_executable_path,
+            version_main=browser_major_version,
+            driver_executable_path=driver_executable_path,
             force=patcher_force_close,
             user_multi_procs=user_multi_procs,
         )
 
-        # self.patcher.auto(user_multiprocess = user_multi_num_procs)
-        self.patcher.auto()
+        if not user_multi_procs:
+            self.patcher.patch()
+
+        self.patcher.verify()
 
         # self.patcher = patcher
         if not options:
@@ -393,10 +375,7 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
         # fixes "could not connect to chrome" error when running
         # on linux using privileged user like root (which i don't recommend)
 
-        options.add_argument(
-            "--log-level=%d" % log_level
-            or divmod(logging.getLogger().getEffectiveLevel(), 10)[0]
-        )
+        options.add_argument("--log-level=%d" % log_level)
 
         if hasattr(options, "handle_prefs"):
             options.handle_prefs(user_data_dir)
@@ -447,7 +426,7 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
             self.browser_pid = browser.pid
 
         service = selenium.webdriver.chromium.service.ChromiumService(
-            self.patcher.executable_path
+            self.patcher.driver_executable_path
         )
 
         super(Chrome, self).__init__(
@@ -708,10 +687,10 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
     def start_session(self, capabilities=None, browser_profile=None):
         if not capabilities:
             capabilities = self.options.to_capabilities()
+
         super(selenium.webdriver.chrome.webdriver.WebDriver, self).start_session(
             capabilities
         )
-        # super(Chrome, self).start_session(capabilities, browser_profile)
 
     def find_elements_recursive(self, by, value):
         """
@@ -751,9 +730,13 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
 
     def quit(self):
         try:
+            self.close()
+            logger.debug("closed browser window")
+        except Exception:
+            pass
+
+        try:
             self.service.process.kill()
-            # has to be closed manually, otherwise socket to driver process gets leaked in CLOSE_WAIT
-            # self.command_executor.close()
             logger.debug("webdriver process ended")
         except (AttributeError, RuntimeError, OSError):
             pass
@@ -763,12 +746,14 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
             logger.debug("shutting down reactor")
         except AttributeError:
             pass
+
         try:
             os.kill(self.browser_pid, 15)
             logger.debug("gracefully closed browser")
-        except Exception as e:  # noqa
+        except Exception:
             pass
 
+        # removing temp profile
         if (
             hasattr(self, "keep_user_data_dir")
             and hasattr(self, "user_data_dir")
@@ -838,104 +823,10 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
     def _ensure_close(cls, self):
         # needs to be a classmethod so finalize can find the reference
         logger.info("ensuring close")
+
         if (
             hasattr(self, "service")
             and hasattr(self.service, "process")
             and hasattr(self.service.process, "kill")
         ):
             self.service.process.kill()
-
-
-def find_chrome_executable():
-    """
-    Finds Google Chrome (stable/beta/canary) first, then Chromium.
-
-    Returns
-    -------
-    executable_path : str | None
-        Full path to the browser executable, or None if not found.
-    """
-
-    candidates = []
-
-    PATH = os.environ.get("PATH")
-
-    # -------- POSIX (Linux / macOS) --------
-    if IS_POSIX and PATH:
-        # Priority order
-        binaries = [
-            "google-chrome",
-            "google-chrome-stable",
-            "google-chrome-beta",
-            "google-chrome-canary",
-            "chrome",
-            "chromium",
-            "chromium-browser",
-        ]
-
-        for path_dir in PATH.split(os.pathsep):
-            for binary in binaries:
-                candidates.append(os.path.join(path_dir, binary))
-
-        # macOS .app paths
-        if sys.platform == "darwin":
-            candidates.extend(
-                [
-                    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-                    "/Applications/Chromium.app/Contents/MacOS/Chromium",
-                ]
-            )
-
-    # -------- Windows --------
-    else:
-        install_roots = (
-            "PROGRAMFILES",
-            "PROGRAMFILES(X86)",
-            "LOCALAPPDATA",
-            "PROGRAMW6432",
-        )
-
-        # Priority order (Chrome FIRST)
-        subpaths = (
-            "Google/Chrome/Application/chrome.exe",
-            "Chromium/Application/chrome.exe",
-        )
-
-        for root in map(os.environ.get, install_roots):
-            if root:
-                for subpath in subpaths:
-                    candidates.append(os.path.join(root, subpath))
-
-    # -------- Check existence --------
-    for candidate in candidates:
-        if os.path.exists(candidate) and os.access(candidate, os.X_OK):
-            return os.path.normpath(candidate)
-
-    return None
-
-
-def get_chrome_version(exe_path):
-    if not exe_path:
-        return None
-
-    try:
-        if sys.platform != "win32":
-            command = [exe_path, "--version"]
-        else:
-            command = [
-                "powershell",
-                "-Command",
-                f"& {{(Get-Item '{exe_path}').VersionInfo.FileVersion}}",
-            ]
-
-        output = subprocess.check_output(
-            command,
-            stderr=subprocess.DEVNULL,
-            text=True,
-        )
-
-        match = re.search(r"\d+\.\d+\.\d+\.\d+", output)
-        return match.group(0) if match else None
-
-    except (subprocess.SubprocessError, OSError):
-        return None

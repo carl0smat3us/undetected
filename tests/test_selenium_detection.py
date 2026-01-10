@@ -17,7 +17,7 @@ else:
 tmp_path.mkdir(parents=True, exist_ok=True)
 
 
-def test_example():
+def test_selenium_detection():
     driver = uc.Chrome(headless=True)
 
     driver.get("chrome://version")
