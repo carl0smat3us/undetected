@@ -50,9 +50,9 @@ def test_multiproc():
 
     assert not failures, f"{len(failures)} process(es) failed"
 
+
 def test_multiproc_without_init():
     process_count = 4
-
 
     ctx = mp.get_context("spawn")
     result_queue = ctx.Queue()
