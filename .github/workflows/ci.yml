@@ -21,17 +21,6 @@ jobs:
         with:
           chrome-version: stable
 
-      - name: Set Chrome in PATH on Linux
-        if: runner.os == 'Linux'
-        run: echo "/opt/hostedtoolcache/chromium/stable/x64" >> $GITHUB_PATH
-
-      - name: Set Chrome in PATH on Windows
-        if: runner.os == 'Windows'
-        shell: powershell
-        run: |
-          $chromePath = "C:\tools\chrome"
-          echo "$chromePath" >> $Env:GITHUB_PATH
-
       - name: Set up Python
         uses: actions/setup-python@v3
         with:
@@ -54,8 +43,5 @@ jobs:
       - name: Install project dependencies
         run: poetry install --with dev --no-root
 
-      - name: Run example test
-        run: poetry run pytest tests/test_example.py
-
-      - name: Run multiprocess test
-        run: poetry run pytest tests/test_multiproc.py
+      - name: Run tests
+        run: poetry run pytest
