@@ -216,7 +216,7 @@ class Patcher:
 
         for item in items:
             try:
-                cls.force_kill_instance(item)
+                cls.kill_all_instances(item)
                 item.unlink()
                 logger.debug("Deleted chromedriver: %s", item)
             except Exception as e:
@@ -314,17 +314,22 @@ class Patcher:
         return self.driver_executable_path
 
     @staticmethod
-    def force_kill_instance(path):
+    def kill_all_instances(path):
         if IS_POSIX:
-            r = os.system(
-                f"pidof {path} >/dev/null && kill -9 $(pidof {path}) || true"
-            )
+            cmd = f"pidof {path} >/dev/null && kill -9 $(pidof {path}) || true"
         else:
-            r = os.system(f"taskkill /f /im {path} >nul 2>&1")
+            cmd = f"taskkill /f /im {path} >nul 2>&1"
 
-        if r == 0:
-            return logger.debug("Killed running instances of %s", path)
-        return logger.error("Failed to kill running instances of %s", path)
+        exit_code = os.system(cmd)
+
+        if exit_code == 0:
+            logger.debug("Killed running instances of %s", path)
+        else:
+            logger.error(
+                "Failed to kill running instances of %s (exit code: %s)",
+                path,
+                exit_code,
+            )
 
     @staticmethod
     def gen_random_cdc():
