@@ -18,7 +18,7 @@ from urllib.request import urlopen, urlretrieve
 
 from packaging.version import Version
 
-from utils.info import IS_POSIX, get_browser_info
+from .utils.info import IS_POSIX, get_browser_info
 
 logger = logging.getLogger(__name__)
 
