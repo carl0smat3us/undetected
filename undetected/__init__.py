@@ -743,6 +743,7 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
             logger.debug("shutting down reactor")
         except AttributeError:
             pass
+
         try:
             os.kill(self.browser_pid, 15)
             logger.debug("gracefully closed browser")
@@ -818,6 +819,7 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
     def _ensure_close(cls, self):
         # needs to be a classmethod so finalize can find the reference
         logger.info("ensuring close")
+
         if (
             hasattr(self, "service")
             and hasattr(self.service, "process")
