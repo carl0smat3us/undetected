@@ -12,13 +12,12 @@ import selenium.webdriver.chrome.webdriver
 import selenium.webdriver.chromium.service
 import selenium.webdriver.remote.command
 
-from utils.info import IS_POSIX, get_browser_info
-
 from .cdp import CDP
 from .dprocess import start_detached
 from .options import ChromeOptions
 from .patcher import Patcher
 from .reactor import Reactor
+from .utils.info import IS_POSIX, get_browser_info
 from .webelement import UCWebElement, WebElement
 
 __all__ = ("Chrome", "ChromeOptions", "Patcher", "Reactor", "CDP")
