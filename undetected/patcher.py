@@ -210,13 +210,16 @@ class Patcher:
     @classmethod
     def cleanup_unused_files(cls):
         p = pathlib.Path(cls.data_path)
-        items = p.glob("*chromedriver*")
+        items = list(p.glob("*chromedriver*"))
+
+        logger.debug("Cleaning up unused files; found: %s", items)
 
         for item in items:
             try:
                 item.unlink()
-            except OSError:
-                pass
+                logger.debug("Deleted chromedriver: %s", item)
+            except Exception as e:
+                logger.debug("Failed to delete chromedriver %s: %s", item, e)
 
     def fetch_release_number(self):
         """
