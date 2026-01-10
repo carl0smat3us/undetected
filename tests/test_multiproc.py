@@ -1,7 +1,7 @@
 import multiprocessing as mp
 
-from tests import logger
 import undetected as uc
+from tests import logger
 from undetected.patcher import Patcher
 
 

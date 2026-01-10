@@ -1,5 +1,7 @@
 import pytest
+
 import undetected as uc
+
 
 @pytest.fixture(autouse=True)
 def before_each_test():
