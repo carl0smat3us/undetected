@@ -688,10 +688,10 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
     def start_session(self, capabilities=None, browser_profile=None):
         if not capabilities:
             capabilities = self.options.to_capabilities()
+
         super(selenium.webdriver.chrome.webdriver.WebDriver, self).start_session(
             capabilities
         )
-        # super(Chrome, self).start_session(capabilities, browser_profile)
 
     def find_elements_recursive(self, by, value):
         """
@@ -731,9 +731,13 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
 
     def quit(self):
         try:
+            self.close()
+            logger.debug("closed browser window")
+        except Exception:
+            pass
+
+        try:
             self.service.process.kill()
-            # has to be closed manually, otherwise socket to driver process gets leaked in CLOSE_WAIT
-            # self.command_executor.close()
             logger.debug("webdriver process ended")
         except (AttributeError, RuntimeError, OSError):
             pass
@@ -747,9 +751,10 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
         try:
             os.kill(self.browser_pid, 15)
             logger.debug("gracefully closed browser")
-        except Exception as e:  # noqa
+        except Exception:
             pass
 
+        # removing temp profile
         if (
             hasattr(self, "keep_user_data_dir")
             and hasattr(self, "user_data_dir")
