@@ -1,6 +1,5 @@
 # this module is part of undetected
 
-
 import json
 import os
 
