@@ -201,8 +201,15 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
             ensures not all processes are trying to modify a binary which is in use by another.
             for this to work.
 
-            YOU SHOULD CALL THE METHOD 'init' TO ENSURE THAT YOU HAVE AT LEAST ONE CHROMEDRIVER BINNARY AVAILABLE.
-            this requirement can be easily satisfied, by just running this program "normal" and close/kill it.
+            YOU SHOULD CALL THE METHOD 'Patcher.patch()' TO ENSURE THAT YOU HAVE AT LEAST ONE UNDETECTED CHROMEDRIVER BINNARY AVAILABLE.
+            --start script--
+            from undetected.patcher import Patcher
+
+            # outside of the multithreading/multiprocessing implementation
+            Patcher.patch()
+            
+            # multithreading/multiprocessing code ...
+            --end script--
         """
 
         finalize(self, self._ensure_close, self)
