@@ -25,7 +25,7 @@ import undetected as uc
 from undetected.patcher import Patcher
 
 def worker(idx: int):
-    driver = uc.Chrome()
+    driver = uc.Chrome(user_multi_procs=True)
     driver.get("https://example.com")
     driver.quit()
 
