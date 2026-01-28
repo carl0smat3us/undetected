@@ -231,6 +231,8 @@ class Patcher:
         :return: version string
         :rtype: Version
         """
+        ssl_ctx = ssl.create_default_context(cafile=certifi.where())
+
         # Endpoint for old versions of Chromedriver (114 and below)
         if self.is_old_chromedriver:
             path = f"/latest_release_{self.version_main}"
@@ -243,7 +245,7 @@ class Patcher:
             # Fetch the latest version
             path = "/last-known-good-versions-with-downloads.json"
             logger.debug("getting release number from %s" % path)
-            with urlopen(self.url_repo + path) as conn:
+            with urlopen(self.url_repo + path, context=ssl_ctx) as conn:
                 response = conn.read().decode()
 
             last_versions = json.loads(response)
@@ -252,7 +254,7 @@ class Patcher:
         # Fetch the latest minor version of the major version provided
         path = "/latest-versions-per-milestone-with-downloads.json"
         logger.debug("getting release number from %s" % path)
-        with urlopen(self.url_repo + path) as conn:
+        with urlopen(self.url_repo + path, context=ssl_ctx) as conn:
             response = conn.read().decode()
 
         major_versions = json.loads(response)
