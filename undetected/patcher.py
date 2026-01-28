@@ -9,13 +9,17 @@ import random
 import re
 import secrets
 import shutil
+import ssl
 import string
 import sys
+import tempfile
 import time
 import zipfile
 from multiprocessing import Lock
-from urllib.request import urlopen, urlretrieve
+from pathlib import Path
+from urllib.request import urlopen
 
+import certifi
 from packaging.version import Version
 
 from .utils.info import IS_POSIX, get_browser_info
@@ -189,7 +193,6 @@ class Patcher:
             with open(p, mode="a+b") as fs:
                 exc = []
                 try:
-
                     fs.seek(0, 0)
                 except PermissionError as e:
                     exc.append(e)  # since some systems apprently allow seeking
@@ -283,7 +286,15 @@ class Patcher:
             download_url %= (str(self.version_full), self.platform_name, zip_name)
 
         logger.debug("downloading from %s" % download_url)
-        return urlretrieve(download_url)[0]
+
+        ssl_ctx = ssl.create_default_context(cafile=certifi.where())
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as tmp_file:
+            tmp_path = Path(tmp_file.name)
+            with urlopen(download_url, context=ssl_ctx) as response:
+                tmp_file.write(response.read())
+
+        return str(tmp_path)
 
     def unzip_package(self, fp):
         """

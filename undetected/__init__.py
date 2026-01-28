@@ -207,7 +207,7 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
 
             # outside of the multithreading/multiprocessing implementation
             Patcher.patch()
-            
+
             # multithreading/multiprocessing code ...
             --end script--
         """
