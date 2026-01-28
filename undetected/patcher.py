@@ -9,13 +9,17 @@ import random
 import re
 import secrets
 import shutil
+import ssl
 import string
 import sys
+import tempfile
 import time
 import zipfile
 from multiprocessing import Lock
-from urllib.request import urlopen, urlretrieve
+from pathlib import Path
+from urllib.request import urlopen
 
+import certifi
 from packaging.version import Version
 
 from .utils.info import IS_POSIX, get_browser_info
@@ -106,6 +110,8 @@ class Patcher:
         self.version_main = version_main
         self.version_full = None
 
+        self.ssl_ctx = ssl.create_default_context(cafile=certifi.where())
+
     def _set_platform_name(self):
         """
         Set the platform and exe name based on the platform undetected is running on
@@ -189,7 +195,6 @@ class Patcher:
             with open(p, mode="a+b") as fs:
                 exc = []
                 try:
-
                     fs.seek(0, 0)
                 except PermissionError as e:
                     exc.append(e)  # since some systems apprently allow seeking
@@ -203,7 +208,7 @@ class Patcher:
                     return True
                 return False
             # ok safe to assume this is in use
-        except Exception as e:
+        except Exception:
             # logger.exception("whoops ", e)
             pass
 
@@ -240,7 +245,7 @@ class Patcher:
             # Fetch the latest version
             path = "/last-known-good-versions-with-downloads.json"
             logger.debug("getting release number from %s" % path)
-            with urlopen(self.url_repo + path) as conn:
+            with urlopen(self.url_repo + path, context=self.ssl_ctx) as conn:
                 response = conn.read().decode()
 
             last_versions = json.loads(response)
@@ -249,7 +254,7 @@ class Patcher:
         # Fetch the latest minor version of the major version provided
         path = "/latest-versions-per-milestone-with-downloads.json"
         logger.debug("getting release number from %s" % path)
-        with urlopen(self.url_repo + path) as conn:
+        with urlopen(self.url_repo + path, context=self.ssl_ctx) as conn:
             response = conn.read().decode()
 
         major_versions = json.loads(response)
@@ -283,7 +288,13 @@ class Patcher:
             download_url %= (str(self.version_full), self.platform_name, zip_name)
 
         logger.debug("downloading from %s" % download_url)
-        return urlretrieve(download_url)[0]
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as tmp_file:
+            tmp_path = Path(tmp_file.name)
+            with urlopen(download_url, context=self.ssl_ctx) as response:
+                tmp_file.write(response.read())
+
+        return str(tmp_path)
 
     def unzip_package(self, fp):
         """
