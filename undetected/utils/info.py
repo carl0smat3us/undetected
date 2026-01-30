@@ -128,5 +128,5 @@ def get_browser_info(browser_executable_path: str | None = None):
 
     return {
         "browser_path": browser_executable_path,
-        "browser_major_version": get_chrome_major_version(browser_executable_path),
+        "browser_main_version": get_chrome_major_version(browser_executable_path),
     }
