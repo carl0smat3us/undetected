@@ -83,7 +83,6 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
         keep_alive=True,
         log_level=0,
         headless=False,
-        patcher_force_close=False,
         suppress_welcome=True,
         use_subprocess=True,
         debug=False,
@@ -161,12 +160,6 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
             Specify whether you want to use the browser in headless mode.
             warning: this lowers undetectability and not fully supported.
 
-        patcher_force_close: bool, optional, default: False
-            instructs the patcher to do whatever it can to access the chromedriver binary
-            if the file is locked, it will force shutdown all instances.
-            setting it is not recommended, unless you know the implications and think
-            you might need it.
-
         suppress_welcome: bool, optional , default: True
             a "welcome" alert might show up on *nix-like systems asking whether you want to set
             chrome as your default browser, and if you want to send even more data to google.
@@ -216,14 +209,13 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
 
         browser_info = get_browser_info(browser_executable_path=browser_executable_path)
         browser_executable_path = browser_info["browser_path"]
-        browser_major_version = browser_info["browser_major_version"]
+        browser_main_version = browser_info["browser_main_version"]
 
         self.debug = debug
 
         self.patcher = Patcher(
-            version_main=browser_major_version,
+            version_main=browser_main_version,
             driver_executable_path=driver_executable_path,
-            force=patcher_force_close,
             user_multi_procs=user_multi_procs,
         )
 
@@ -274,7 +266,6 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
 
         # see if a custom user profile is specified in options
         for arg in options.arguments:
-
             if any([_ in arg for _ in ("--headless", "headless")]):
                 options.arguments.remove(arg)
                 options.headless = True
