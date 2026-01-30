@@ -75,11 +75,8 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
         browser_executable_path=None,
         port=0,
         enable_cdp_events=False,
-        # service_args=None,
-        # service_creationflags=None,
         desired_capabilities=None,
         advanced_elements=False,
-        # service_log_path=None,
         keep_alive=True,
         log_level=0,
         headless=False,
@@ -127,10 +124,6 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
                 driver.add_cdp_listener("Network.dataReceived", yourcallback)
                 # yourcallback is an callable which accepts exactly 1 dict as parameter
 
-
-        service_args: list of str, optional, default: None
-            arguments to pass to the driver service
-
         desired_capabilities: dict, optional, default: None - auto from config
             Dictionary object with non-browser specific capabilities only, such as "item" or "loggingPref".
 
@@ -145,10 +138,6 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
             <WebElement(<a class="mobile-show-inline-block mc-update-infos init-ok" href="#" id="main-cat-switcher-mobile">)>
 
             note: when retrieving large amounts of elements ( example: find_elements_by_tag("*") ) and print them, it does take a little more time.
-
-
-        service_log_path: str, optional, default: None
-             path to log information from the driver.
 
         keep_alive: bool, optional, default: True
              Whether to configure ChromeRemoteConnection to use HTTP keep-alive.
