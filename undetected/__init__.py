@@ -75,15 +75,11 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
         browser_executable_path=None,
         port=0,
         enable_cdp_events=False,
-        # service_args=None,
-        # service_creationflags=None,
         desired_capabilities=None,
         advanced_elements=False,
-        # service_log_path=None,
         keep_alive=True,
         log_level=0,
         headless=False,
-        patcher_force_close=False,
         suppress_welcome=True,
         use_subprocess=True,
         debug=False,
@@ -128,10 +124,6 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
                 driver.add_cdp_listener("Network.dataReceived", yourcallback)
                 # yourcallback is an callable which accepts exactly 1 dict as parameter
 
-
-        service_args: list of str, optional, default: None
-            arguments to pass to the driver service
-
         desired_capabilities: dict, optional, default: None - auto from config
             Dictionary object with non-browser specific capabilities only, such as "item" or "loggingPref".
 
@@ -147,10 +139,6 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
 
             note: when retrieving large amounts of elements ( example: find_elements_by_tag("*") ) and print them, it does take a little more time.
 
-
-        service_log_path: str, optional, default: None
-             path to log information from the driver.
-
         keep_alive: bool, optional, default: True
              Whether to configure ChromeRemoteConnection to use HTTP keep-alive.
 
@@ -160,12 +148,6 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
             can also be specified in the options instance.
             Specify whether you want to use the browser in headless mode.
             warning: this lowers undetectability and not fully supported.
-
-        patcher_force_close: bool, optional, default: False
-            instructs the patcher to do whatever it can to access the chromedriver binary
-            if the file is locked, it will force shutdown all instances.
-            setting it is not recommended, unless you know the implications and think
-            you might need it.
 
         suppress_welcome: bool, optional , default: True
             a "welcome" alert might show up on *nix-like systems asking whether you want to set
@@ -216,14 +198,13 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
 
         browser_info = get_browser_info(browser_executable_path=browser_executable_path)
         browser_executable_path = browser_info["browser_path"]
-        browser_major_version = browser_info["browser_major_version"]
+        browser_main_version = browser_info["browser_main_version"]
 
         self.debug = debug
 
         self.patcher = Patcher(
-            version_main=browser_major_version,
+            version_main=browser_main_version,
             driver_executable_path=driver_executable_path,
-            force=patcher_force_close,
             user_multi_procs=user_multi_procs,
         )
 
@@ -274,7 +255,6 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
 
         # see if a custom user profile is specified in options
         for arg in options.arguments:
-
             if any([_ in arg for _ in ("--headless", "headless")]):
                 options.arguments.remove(arg)
                 options.headless = True

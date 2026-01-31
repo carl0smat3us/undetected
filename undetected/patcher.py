@@ -49,23 +49,19 @@ class Patcher:
         self,
         version_main,
         driver_executable_path=None,
-        force=False,
         user_multi_procs=False,
         for_patch=False,
     ):
         """
         Args:
             version_main:
-                specify main chrome version (rounded, ex: 82)
+                browser main/major version
             driver_executable_path: None = automatic
                              a full file path to the chromedriver executable
-            force: False
-                    terminate processes which are holding lock
             for_patch: False
                     rather the class is only being used to call the method `patch` or not
 
         """
-        self.force = force
         self.for_patch = for_patch
         self._using_custom_exe = False
 
@@ -74,6 +70,7 @@ class Patcher:
         self.user_multi_procs = user_multi_procs
 
         self.is_old_chromedriver = version_main <= 114
+
         # Needs to be called before self.exe_name is accessed
         self._set_platform_name()
 
@@ -108,6 +105,7 @@ class Patcher:
             self.url_repo = "https://googlechromelabs.github.io/chrome-for-testing"
 
         self.version_main = version_main
+
         self.version_full = None
 
         self.ssl_ctx = ssl.create_default_context(cafile=certifi.where())
@@ -229,36 +227,26 @@ class Patcher:
 
     def fetch_release_number(self):
         """
-        Gets the latest major version available, or the latest major version of self.target_version if set explicitly.
+        Gets the latest full version of the main/major version provided
         :return: version string
         :rtype: Version
         """
-        # Endpoint for old versions of Chromedriver (114 and below)
         if self.is_old_chromedriver:
             path = f"/latest_release_{self.version_main}"
             path = path.upper()
             logger.debug("getting release number from %s" % path)
             return Version(urlopen(self.url_repo + path).read().decode())
 
-        # Endpoint for new versions of Chromedriver (115+)
-        if not self.version_main:
-            # Fetch the latest version
-            path = "/last-known-good-versions-with-downloads.json"
-            logger.debug("getting release number from %s" % path)
-            with urlopen(self.url_repo + path, context=self.ssl_ctx) as conn:
-                response = conn.read().decode()
-
-            last_versions = json.loads(response)
-            return Version(last_versions["channels"]["Stable"]["version"])
-
-        # Fetch the latest minor version of the major version provided
         path = "/latest-versions-per-milestone-with-downloads.json"
+
         logger.debug("getting release number from %s" % path)
+
         with urlopen(self.url_repo + path, context=self.ssl_ctx) as conn:
             response = conn.read().decode()
 
-        major_versions = json.loads(response)
-        return Version(major_versions["milestones"][str(self.version_main)]["version"])
+        return Version(
+            json.loads(response)["milestones"][str(self.version_main)]["version"]
+        )
 
     def parse_exe_version(self):
         with io.open(self.driver_executable_path, "rb") as f:
@@ -274,6 +262,7 @@ class Patcher:
         :return: path to downloaded file
         """
         zip_name = f"chromedriver_{self.platform_name}.zip"
+
         if self.is_old_chromedriver:
             download_url = "%s/%s/%s" % (
                 self.url_repo,
@@ -389,7 +378,7 @@ class Patcher:
     def patch(browser_executable_path=None, driver_executable_path=None):
         patcher = Patcher(
             version_main=get_browser_info(browser_executable_path)[
-                "browser_major_version"
+                "browser_main_version"
             ],
             driver_executable_path=driver_executable_path,
             for_patch=True,
