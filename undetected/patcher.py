@@ -155,7 +155,7 @@ class Patcher:
                 if f != most_recent:
                     try:
                         f.unlink()
-                    except FileNotFoundError:
+                    except (FileNotFoundError,PermissionError):
                         pass
 
             if self.is_binary_patched(most_recent):
