@@ -339,28 +339,22 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
 
         if suppress_welcome:
             options.arguments.extend(["--no-default-browser-check", "--no-first-run"])
+
         if no_sandbox:
             options.arguments.extend(["--no-sandbox", "--test-type"])
 
         if headless or getattr(options, "headless", None):
-            # workaround until a better checking is found
-            try:
-                if self.patcher.version_main and self.patcher.version_main < 108:
-                    options.add_argument("--headless=chrome")
-                elif self.patcher.version_main and self.patcher.version_main >= 108:
-                    options.add_argument("--headless=new")
-            except:
-                logger.warning(
-                    "could not detect version_main."
-                    "therefore, we are assuming it is chrome 108 or higher"
-                )
+            if self.patcher.version_main < 108:
+                options.add_argument("--headless=chrome")
+            else:
                 options.add_argument("--headless=new")
 
         options.add_argument("--window-size=1920,1080")
         options.add_argument("--start-maximized")
-        options.add_argument("--no-sandbox")
-        # fixes "could not connect to chrome" error when running
+
+        # to fix "could not connect to chrome" error when running
         # on linux using privileged user like root (which i don't recommend)
+        options.add_argument("--no-sandbox")
 
         options.add_argument("--log-level=%d" % log_level)
 
@@ -583,38 +577,7 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
 
         self.get = get_wrapped
 
-    # def _get_cdc_props(self):
-    #     return self.execute_script(
-    #         """
-    #         let objectToInspect = window,
-    #             result = [];
-    #         while(objectToInspect !== null)
-    #         { result = result.concat(Object.getOwnPropertyNames(objectToInspect));
-    #           objectToInspect = Object.getPrototypeOf(objectToInspect); }
-    #
-    #         return result.filter(i => i.match(/^([a-zA-Z]){27}(Array|Promise|Symbol)$/ig))
-    #         """
-    #     )
-    #
-    # def _hook_remove_cdc_props(self):
-    #     self.execute_cdp_cmd(
-    #         "Page.addScriptToEvaluateOnNewDocument",
-    #         {
-    #             "source": """
-    #                 let objectToInspect = window,
-    #                     result = [];
-    #                 while(objectToInspect !== null)
-    #                 { result = result.concat(Object.getOwnPropertyNames(objectToInspect));
-    #                   objectToInspect = Object.getPrototypeOf(objectToInspect); }
-    #                 result.forEach(p => p.match(/^([a-zA-Z]){27}(Array|Promise|Symbol)$/ig)
-    #                                     &&delete window[p]&&console.log('removed',p))
-    #                 """
-    #         },
-    #     )
-
     def get(self, url):
-        # if self._get_cdc_props():
-        #     self._hook_remove_cdc_props()
         return super().get(url)
 
     def add_cdp_listener(self, event_name, callback):
