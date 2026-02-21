@@ -22,7 +22,7 @@ jobs:
           chrome-version: stable
 
       - name: Set up Python
-        uses: actions/setup-python@6
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
 
