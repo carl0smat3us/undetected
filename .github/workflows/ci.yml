@@ -19,10 +19,10 @@ jobs:
       - name: Setup Chrome
         uses: browser-actions/setup-chrome@v2.1.0
         with:
-          chrome-version: stable
+          chrome-version: latest
 
       - name: Set up Python
-        uses: actions/setup-python@6
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
 
