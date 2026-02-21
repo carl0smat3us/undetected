@@ -47,7 +47,7 @@ class Patcher:
 
     def __init__(
         self,
-        version_main,
+        browser_executable_path=None,
         driver_executable_path=None,
         user_multi_procs=False,
         for_patch=False,
@@ -63,13 +63,22 @@ class Patcher:
 
         """
         self.for_patch = for_patch
-        self._using_custom_exe = False
 
-        prefix = secrets.token_hex(8)
+        self._using_custom_exe = False
 
         self.user_multi_procs = user_multi_procs
 
-        self.is_old_chromedriver = version_main <= 114
+        prefix = secrets.token_hex(8)
+
+        browser_info = get_browser_info(browser_executable_path=browser_executable_path)
+
+        self.browser_executable_path = browser_info["browser_path"]
+
+        self.version_main = browser_info["browser_main_version"]
+
+        self.version_full = None
+
+        self.is_old_chromedriver = self.version_main <= 114
 
         # Needs to be called before self.exe_name is accessed
         self._set_platform_name()
@@ -103,10 +112,6 @@ class Patcher:
             self.url_repo = "https://chromedriver.storage.googleapis.com"
         else:
             self.url_repo = "https://googlechromelabs.github.io/chrome-for-testing"
-
-        self.version_main = version_main
-
-        self.version_full = None
 
         self.ssl_ctx = ssl.create_default_context(cafile=certifi.where())
 
@@ -378,9 +383,7 @@ class Patcher:
     @staticmethod
     def patch(browser_executable_path=None, driver_executable_path=None):
         patcher = Patcher(
-            version_main=get_browser_info(browser_executable_path)[
-                "browser_main_version"
-            ],
+            browser_executable_path=browser_executable_path,
             driver_executable_path=driver_executable_path,
             for_patch=True,
         )
