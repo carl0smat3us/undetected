@@ -196,24 +196,22 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
 
         finalize(self, self._ensure_close, self)
 
-        browser_info = get_browser_info(browser_executable_path=browser_executable_path)
-        browser_executable_path = browser_info["browser_path"]
-        browser_main_version = browser_info["browser_main_version"]
-
         self.debug = debug
 
         self.patcher = Patcher(
-            version_main=browser_main_version,
+            browser_executable_path=browser_executable_path,
             driver_executable_path=driver_executable_path,
             user_multi_procs=user_multi_procs,
         )
 
         if not user_multi_procs:
-            self.patcher.patch()
+            self.patcher.patch(
+                browser_executable_path=browser_executable_path,
+                driver_executable_path=driver_executable_path,
+            )
 
         self.patcher.verify()
 
-        # self.patcher = patcher
         if not options:
             options = ChromeOptions()
 
@@ -330,7 +328,7 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
 
         options.add_argument("--lang=%s" % language)
 
-        options.binary_location = browser_executable_path
+        options.binary_location = self.patcher.browser_executable_path
 
         self._delay = 3
 
