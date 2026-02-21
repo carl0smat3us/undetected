@@ -14,7 +14,7 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v6
 
       - name: Setup Chrome
         uses: browser-actions/setup-chrome@v2.1.0
@@ -22,7 +22,7 @@ jobs:
           chrome-version: stable
 
       - name: Set up Python
-        uses: actions/setup-python@6.2.0
+        uses: actions/setup-python@6
         with:
           python-version: ${{ matrix.python-version }}
 
