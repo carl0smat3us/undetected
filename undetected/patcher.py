@@ -64,7 +64,7 @@ class Patcher:
         """
         self.for_patch = for_patch
 
-        self._using_custom_exe = False
+        self._using_custom_driver = False
 
         self.user_multi_procs = user_multi_procs
 
@@ -96,7 +96,7 @@ class Patcher:
                 if not driver_executable_path[-4:] == ".exe":
                     driver_executable_path += ".exe"
 
-        self.zip_path = os.path.join(self.data_path, prefix)
+        self.driver_zip_path = os.path.join(self.data_path, prefix)
 
         if not driver_executable_path and not self.user_multi_procs:
             self.driver_executable_path = os.path.abspath(
@@ -104,7 +104,7 @@ class Patcher:
             )
 
         if driver_executable_path:
-            self._using_custom_exe = True
+            self._using_custom_driver = True
             self.driver_executable_path = driver_executable_path
 
         # Set the correct repository to download the Chromedriver from
@@ -137,6 +137,9 @@ class Patcher:
         """
         Verify if the binary is patched.
         """
+        if self._using_custom_driver:
+            return self.is_binary_patched(self.driver_executable_path)
+
         p = pathlib.Path(self.data_path)
 
         with self.lock:
@@ -169,12 +172,16 @@ class Patcher:
                 return True
 
     def download_and_patch(self):
-        release = self.fetch_release_number()
+        if (
+            not self._using_custom_driver
+        ):  # the driver_executable_path was not specified, download it
+            release = self.fetch_release_number()
 
-        self.version_main = release.major
-        self.version_full = release
+            self.version_main = release.major
+            self.version_full = release
 
-        self.unzip_package(self.fetch_package())
+            self.unzip_package(self.fetch_package())
+
         self.patch_exe()
 
         return self.is_binary_patched()
@@ -294,10 +301,9 @@ class Patcher:
     def unzip_package(self, fp):
         """
         Unzips chromedriver
-
-        :return: path to unpacked executable
         """
         exe_path = self.exe_name
+
         if not self.is_old_chromedriver:
             # The new chromedriver unzips into its own folder
             zip_name = f"chromedriver-{self.platform_name}"
@@ -306,18 +312,24 @@ class Patcher:
         logger.debug("unzipping %s" % fp)
 
         try:
-            os.unlink(self.zip_path)
+            os.unlink(self.driver_zip_path)
         except (FileNotFoundError, OSError):
             pass
 
-        os.makedirs(self.zip_path, mode=0o755, exist_ok=True)
+        os.makedirs(self.driver_zip_path, mode=0o755, exist_ok=True)
+
         with zipfile.ZipFile(fp, mode="r") as zf:
-            zf.extractall(self.zip_path)
-        os.rename(os.path.join(self.zip_path, exe_path), self.driver_executable_path)
+            zf.extractall(self.driver_zip_path)
+
+        os.rename(
+            os.path.join(self.driver_zip_path, exe_path), self.driver_executable_path
+        )
+
         os.remove(fp)
-        shutil.rmtree(self.zip_path)
+
+        shutil.rmtree(self.driver_zip_path)
+
         os.chmod(self.driver_executable_path, 0o755)
-        return self.driver_executable_path
 
     @staticmethod
     def kill_all_instances(path):
@@ -398,7 +410,7 @@ class Patcher:
 
     def __del__(self):
         if (
-            not self._using_custom_exe
+            not self._using_custom_driver
             and not self.for_patch
             and not self.user_multi_procs
         ):
