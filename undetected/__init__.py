@@ -17,7 +17,7 @@ from .dprocess import start_detached
 from .options import ChromeOptions
 from .patcher import Patcher
 from .reactor import Reactor
-from .utils.info import IS_POSIX, get_browser_info
+from .utils.info import IS_POSIX
 from .webelement import UCWebElement, WebElement
 
 __all__ = ("Chrome", "ChromeOptions", "Patcher", "Reactor", "CDP")
