@@ -6,11 +6,7 @@ def test_basic():
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
 
-    driver = uc.Chrome(
-        options=options,
-        headless=True,
-        driver_executable_path="/home/carlos/Documents/stuff/undetected/tests/chromedriver",
-    )
+    driver = uc.Chrome(options=options, headless=True)
 
     driver.get("https://example.com")
     title = driver.title
