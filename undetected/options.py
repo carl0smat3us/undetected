@@ -2,6 +2,7 @@
 
 import json
 import os
+from pathlib import Path
 
 from selenium.webdriver.chromium.options import \
     ChromiumOptions as _ChromiumOptions
@@ -27,8 +28,7 @@ class ChromeOptions(_ChromiumOptions):
             the path to a chrome profile folder
             if it does not exist, a new profile will be created at given location
         """
-        apath = os.path.abspath(path)
-        self._user_data_dir = os.path.normpath(apath)
+        self._user_data_dir = Path(path).resolve()
 
     @staticmethod
     def _undot_key(key, value):
@@ -56,7 +56,7 @@ class ChromeOptions(_ChromiumOptions):
         prefs = self.experimental_options.get("prefs")
         if prefs:
             user_data_dir = user_data_dir or self._user_data_dir
-            default_path = os.path.join(user_data_dir, "Default")
+            default_path = Path(str(user_data_dir)) / "Default"
             os.makedirs(default_path, exist_ok=True)
 
             # undot prefs dict keys
@@ -66,8 +66,8 @@ class ChromeOptions(_ChromiumOptions):
                     undot_prefs, self._undot_key(key, value)
                 )
 
-            prefs_file = os.path.join(default_path, "Preferences")
-            if os.path.exists(prefs_file):
+            prefs_file = Path(str(default_path)) / "Preferences"
+            if Path(prefs_file).exists():
                 with open(prefs_file, encoding="latin1", mode="r") as f:
                     undot_prefs = self._merge_nested(json.load(f), undot_prefs)
 
