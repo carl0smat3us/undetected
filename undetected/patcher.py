@@ -11,6 +11,7 @@ import secrets
 import shutil
 import ssl
 import string
+import subprocess
 import sys
 import tempfile
 import time
@@ -32,6 +33,7 @@ class Patcher:
     exe_name = "chromedriver%s"
 
     platform = sys.platform
+
     if platform.endswith("win32"):
         d = "~/appdata/roaming/undetected"
     elif "LAMBDA_TASK_ROOT" in os.environ:
@@ -43,7 +45,19 @@ class Patcher:
     else:
         d = "~/.undetected"
 
-    data_path = os.path.abspath(os.path.expanduser(d))
+    if platform.endswith("win32"):
+        platform_name = "win32"
+        exe_name %= ".exe"
+    if platform.endswith(("linux", "linux2")):
+        platform_name = "linux64"
+        exe_name %= ""
+    if platform.endswith("darwin"):
+        platform_name = "mac-x64"
+        exe_name %= ""
+
+    data_path = Path(d).expanduser().resolve()
+
+    ssl_ctx = ssl.create_default_context(cafile=certifi.where())
 
     def __init__(
         self,
@@ -76,19 +90,18 @@ class Patcher:
 
         self.version_main = browser_info["browser_main_version"]
 
-        self.version_full = None
+        self.full_version = None
 
-        self.is_old_chromedriver = self.version_main <= 114
+        if self.version_main <= 114:
+            logger.error("Unsupported browser version: %s", self.version_main)
+            os._exit(1)
 
-        # Needs to be called before self.exe_name is accessed
-        self._set_platform_name()
-
-        if not os.path.exists(self.data_path):
+        if not Path(self.data_path).exists():
             os.makedirs(self.data_path, exist_ok=True)
 
         if not driver_executable_path:
-            self.driver_executable_path = os.path.join(
-                self.data_path, "_".join([prefix, self.exe_name])
+            self.driver_executable_path = (
+                Path(self.data_path) / f"{prefix}_{self.exe_name}"
             )
 
         if not IS_POSIX:
@@ -96,42 +109,14 @@ class Patcher:
                 if not driver_executable_path[-4:] == ".exe":
                     driver_executable_path += ".exe"
 
-        self.driver_zip_path = os.path.join(self.data_path, prefix)
+        self.driver_zip_path = Path(self.data_path) / prefix
 
         if not driver_executable_path and not self.user_multi_procs:
-            self.driver_executable_path = os.path.abspath(
-                os.path.join(".", self.driver_executable_path)
-            )
+            self.driver_executable_path = Path(self.driver_executable_path).resolve()
 
         if driver_executable_path:
             self._using_custom_driver = True
             self.driver_executable_path = driver_executable_path
-
-        # Set the correct repository to download the Chromedriver from
-        if self.is_old_chromedriver:
-            self.url_repo = "https://chromedriver.storage.googleapis.com"
-        else:
-            self.url_repo = "https://googlechromelabs.github.io/chrome-for-testing"
-
-        self.ssl_ctx = ssl.create_default_context(cafile=certifi.where())
-
-    def _set_platform_name(self):
-        """
-        Set the platform and exe name based on the platform undetected is running on
-        in order to download the correct chromedriver.
-        """
-        if self.platform.endswith("win32"):
-            self.platform_name = "win32"
-            self.exe_name %= ".exe"
-        if self.platform.endswith(("linux", "linux2")):
-            self.platform_name = "linux64"
-            self.exe_name %= ""
-        if self.platform.endswith("darwin"):
-            if self.is_old_chromedriver:
-                self.platform_name = "mac64"
-            else:
-                self.platform_name = "mac-x64"
-            self.exe_name %= ""
 
     def verify(self):
         """
@@ -175,12 +160,35 @@ class Patcher:
         if (
             not self._using_custom_driver
         ):  # the driver_executable_path was not specified, download it
-            release = self.fetch_release_number()
+            release = self.fetch_release_number(self.version_main)
 
             self.version_main = release.major
-            self.version_full = release
+            self.full_version = release
 
-            self.unzip_package(self.fetch_package())
+            unpatched_bin_found = False
+
+            # check if the driver unpatched binary is available
+            for file in list(pathlib.Path(self.data_path).glob("*unpatched*")):
+                if str(self.full_version) in file.name:
+                    unpatched_bin_found = True
+                else:
+                    try:
+                        os.remove(file)
+                    except OSError:
+                        pass
+
+            if not unpatched_bin_found:
+                self.unzip_package(
+                    self.fetch_package(self.full_version),
+                    f"unpatched_{str(self.full_version)}",
+                )
+
+            # make a copy of the unpatched binary
+            unpatched_path = (
+                Path(str(self.data_path)) / f"unpatched_{str(self.full_version)}"
+            )
+            shutil.copy(unpatched_path, self.driver_executable_path)
+            os.chmod(self.driver_executable_path, 0o755)
 
         self.patch_exe()
 
@@ -196,7 +204,7 @@ class Patcher:
                   if not specified, we check use this object's driver_executable_path
         """
         if not path:
-            path = self.driver_executable_path
+            path = str(self.driver_executable_path)
 
         p = pathlib.Path(path)
 
@@ -225,8 +233,7 @@ class Patcher:
 
     @classmethod
     def cleanup_unused_files(cls):
-        p = pathlib.Path(cls.data_path)
-        items = list(p.glob("*chromedriver*"))
+        items = list(pathlib.Path(cls.data_path).glob("*chromedriver*"))
 
         logger.debug("Cleaning up unused files; found: %s", items)
 
@@ -238,28 +245,22 @@ class Patcher:
             except Exception as e:
                 logger.debug("Failed to delete chromedriver %s: %s", item, e)
 
-    def fetch_release_number(self):
+    @classmethod
+    def fetch_release_number(cls, version_main):
         """
         Gets the latest full version of the main/major version provided
         :return: version string
         :rtype: Version
         """
-        if self.is_old_chromedriver:
-            path = f"/latest_release_{self.version_main}"
-            path = path.upper()
-            logger.debug("getting release number from %s" % path)
-            return Version(urlopen(self.url_repo + path).read().decode())
+        logger.debug("getting release number")
 
-        path = "/latest-versions-per-milestone-with-downloads.json"
-
-        logger.debug("getting release number from %s" % path)
-
-        with urlopen(self.url_repo + path, context=self.ssl_ctx) as conn:
+        with urlopen(
+            "https://googlechromelabs.github.io/chrome-for-testing/latest-versions-per-milestone-with-downloads.json",
+            context=cls.ssl_ctx,
+        ) as conn:
             response = conn.read().decode()
 
-        return Version(
-            json.loads(response)["milestones"][str(self.version_main)]["version"]
-        )
+        return Version(json.loads(response)["milestones"][str(version_main)]["version"])
 
     def parse_exe_version(self):
         with io.open(self.driver_executable_path, "rb") as f:
@@ -268,68 +269,71 @@ class Patcher:
                 if match:
                     return Version(match[1].decode())
 
-    def fetch_package(self):
+    @classmethod
+    def fetch_package(cls, full_version):
         """
         Downloads ChromeDriver from source
 
         :return: path to downloaded file
         """
-        zip_name = f"chromedriver_{self.platform_name}.zip"
+        zip_name = f"chromedriver_{cls.platform_name}.zip"
 
-        if self.is_old_chromedriver:
-            download_url = "%s/%s/%s" % (
-                self.url_repo,
-                str(self.version_full),
-                zip_name,
-            )
-        else:
-            zip_name = zip_name.replace("_", "-", 1)
-            download_url = (
-                "https://storage.googleapis.com/chrome-for-testing-public/%s/%s/%s"
-            )
-            download_url %= (str(self.version_full), self.platform_name, zip_name)
+        zip_name = zip_name.replace("_", "-", 1)
+
+        download_url = (
+            "https://storage.googleapis.com/chrome-for-testing-public/%s/%s/%s"
+        )
+
+        download_url %= (str(full_version), cls.platform_name, zip_name)
 
         logger.debug("downloading from %s" % download_url)
 
         with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as tmp_file:
             tmp_path = Path(tmp_file.name)
-            with urlopen(download_url, context=self.ssl_ctx) as response:
+            with urlopen(download_url, context=cls.ssl_ctx) as response:
                 tmp_file.write(response.read())
 
         return str(tmp_path)
 
-    def unzip_package(self, fp):
+    @classmethod
+    def unzip_package(cls, fp, unpatched_path=None):
         """
-        Unzips chromedriver
+        Unzips chromedriver and returns the extracted driver path.
         """
-        exe_path = self.exe_name
-
-        if not self.is_old_chromedriver:
-            # The new chromedriver unzips into its own folder
-            zip_name = f"chromedriver-{self.platform_name}"
-            exe_path = os.path.join(zip_name, self.exe_name)
-
         logger.debug("unzipping %s" % fp)
 
-        try:
-            os.unlink(self.driver_zip_path)
-        except (FileNotFoundError, OSError):
-            pass
+        fp = Path(fp)
 
-        os.makedirs(self.driver_zip_path, mode=0o755, exist_ok=True)
+        with tempfile.TemporaryDirectory() as extract_dir:
+            extract_dir = Path(extract_dir)
 
-        with zipfile.ZipFile(fp, mode="r") as zf:
-            zf.extractall(self.driver_zip_path)
+            with zipfile.ZipFile(fp, mode="r") as zf:
+                zf.extractall(extract_dir)
 
-        os.rename(
-            os.path.join(self.driver_zip_path, exe_path), self.driver_executable_path
-        )
+            extracted_driver = (
+                extract_dir / f"chromedriver-{cls.platform_name}" / cls.exe_name
+            )
 
-        os.remove(fp)
+            if unpatched_path is None:
+                final_path = Path(cls.data_path) / cls.exe_name
+            else:
+                final_path = Path(unpatched_path)
 
-        shutil.rmtree(self.driver_zip_path)
+                if not final_path.is_absolute():
+                    final_path = Path(cls.data_path) / final_path
 
-        os.chmod(self.driver_executable_path, 0o755)
+                if final_path.is_dir():
+                    final_path = final_path / cls.exe_name
+
+            final_path.parent.mkdir(parents=True, exist_ok=True)
+
+            shutil.move(str(extracted_driver), str(final_path))
+
+        fp.unlink(missing_ok=True)
+
+        os.chmod(final_path, 0o755)
+
+        return str(final_path)
 
     @staticmethod
     def kill_all_instances(path):
@@ -338,7 +342,12 @@ class Patcher:
         else:
             cmd = f"taskkill /f /im {path} >nul 2>&1"
 
-        exit_code = os.system(cmd)
+        exit_code = subprocess.run(
+            cmd,
+            shell=True,
+            capture_output=True,
+            text=True,
+        )
 
         if exit_code == 0:
             logger.debug("Killed running instances of %s", path)

@@ -5,6 +5,7 @@ import time
 import traceback
 from collections.abc import Mapping, Sequence
 from functools import wraps
+from pathlib import Path
 from typing import Any, Awaitable, Callable, List, Optional
 
 
@@ -96,10 +97,9 @@ def timeout(seconds=3, on_timeout: Optional[Callable[[callable], Any]] = None):
 
 
 def test():
-    import os
     import sys
 
-    sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
     import threading
 
     import undetected as uc

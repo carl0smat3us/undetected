@@ -1,8 +1,8 @@
 import os
-import pathlib
 import re
 import subprocess
 import sys
+from pathlib import Path
 
 IS_POSIX = sys.platform.startswith(("darwin", "cygwin", "linux", "linux2"))
 
@@ -36,7 +36,7 @@ def find_chrome_executable():
 
         for path_dir in PATH.split(os.pathsep):
             for binary in binaries:
-                candidates.append(os.path.join(path_dir, binary))
+                candidates.append(Path(path_dir) / binary)
 
         # macOS .app paths
         if sys.platform == "darwin":
@@ -56,7 +56,7 @@ def find_chrome_executable():
             "PROGRAMW6432",
         )
 
-        # Priority order (Chrome FIRST)
+        # Priority order
         subpaths = (
             "Google/Chrome/Application/chrome.exe",
             "Chromium/Application/chrome.exe",
@@ -65,12 +65,12 @@ def find_chrome_executable():
         for root in map(os.environ.get, install_roots):
             if root:
                 for subpath in subpaths:
-                    candidates.append(os.path.join(root, subpath))
+                    candidates.append(Path(str(root)) / subpath)
 
-    # -------- Check existence --------
+    # Check existence
     for candidate in candidates:
-        if os.path.exists(candidate) and os.access(candidate, os.X_OK):
-            return os.path.normpath(candidate)
+        if Path(candidate).exists() and Path(candidate).is_file():
+            return Path(candidate)
 
     return None
 
@@ -113,12 +113,9 @@ def get_chrome_major_version(exe_path: str):
 
 def get_browser_info(browser_executable_path: str | None = None):
     if not browser_executable_path:
-        browser_executable_path = find_chrome_executable()
+        browser_executable_path = str(find_chrome_executable())
 
-    if (
-        not browser_executable_path
-        or not pathlib.Path(browser_executable_path).exists()
-    ):
+    if not browser_executable_path or not Path(browser_executable_path).exists():
         raise FileNotFoundError("Could not determine browser executable.")
 
     version = get_chrome_version(browser_executable_path)
@@ -128,5 +125,6 @@ def get_browser_info(browser_executable_path: str | None = None):
 
     return {
         "browser_path": browser_executable_path,
+        "browser_version": version,
         "browser_main_version": get_chrome_major_version(browser_executable_path),
     }
