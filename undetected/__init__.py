@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import tempfile
 import time
+from pathlib import Path
 from weakref import finalize
 
 import selenium.webdriver.chrome.webdriver
@@ -301,7 +302,7 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
                 )
 
             else:
-                user_data_dir = os.path.normpath(tempfile.mkdtemp())
+                user_data_dir = Path(tempfile.mkdtemp()).resolve()
                 keep_user_data_dir = False
                 arg = "--user-data-dir=%s" % user_data_dir
                 options.add_argument(arg)
@@ -364,7 +365,7 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
         default_profile = None
 
         if user_data_dir:
-            default_profile = os.path.join(user_data_dir, "Default/Preferences")
+            default_profile = Path(str(user_data_dir)) / "Default/Preferences"
 
             try:
                 with open(
@@ -405,7 +406,7 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
             self.browser_pid = browser.pid
 
         service = selenium.webdriver.chromium.service.ChromiumService(
-            self.patcher.driver_executable_path
+            str(self.patcher.driver_executable_path)
         )
 
         super(Chrome, self).__init__(
@@ -679,25 +680,21 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
     def quit(self):
         try:
             self.close()
-            logger.debug("closed browser window")
         except Exception:
             pass
 
         try:
             self.service.process.kill()
-            logger.debug("webdriver process ended")
         except (AttributeError, RuntimeError, OSError):
             pass
 
         try:
             self.reactor.event.set()
-            logger.debug("shutting down reactor")
         except AttributeError:
             pass
 
         try:
             os.kill(self.browser_pid, 15)
-            logger.debug("gracefully closed browser")
         except Exception:
             pass
 
@@ -769,9 +766,6 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
 
     @classmethod
     def _ensure_close(cls, self):
-        # needs to be a classmethod so finalize can find the reference
-        logger.info("ensuring close")
-
         if (
             hasattr(self, "service")
             and hasattr(self.service, "process")
