@@ -1,6 +1,5 @@
 # this module is part of undetected
 
-import io
 import json
 import logging
 import os
@@ -266,7 +265,7 @@ class Patcher:
         return Version(json.loads(response)["milestones"][str(version_main)]["version"])
 
     def parse_exe_version(self):
-        with io.open(self.driver_executable_path, "rb") as f:
+        with open(self.driver_executable_path, "rb") as f:
             for line in iter(lambda: f.readline(), b""):
                 match = re.search(rb"platform_handle\x00content\x00([0-9.]*)", line)
                 if match:
@@ -375,7 +374,7 @@ class Patcher:
     def is_binary_patched(self, driver_executable_path=None):
         driver_executable_path = driver_executable_path or self.driver_executable_path
         try:
-            with io.open(driver_executable_path, "rb") as fh:
+            with open(driver_executable_path, "rb") as fh:
                 content = fh.read()
             return b"{/*uc*/" in content or b"undetected chromedriver" in content
         except FileNotFoundError:
@@ -384,7 +383,7 @@ class Patcher:
     def patch_exe(self):
         start = time.perf_counter()
         logger.info("patching driver executable %s" % self.driver_executable_path)
-        with io.open(self.driver_executable_path, "r+b") as fh:
+        with open(self.driver_executable_path, "r+b") as fh:
             content = fh.read()
             match_injected_codeblock = re.search(rb"\{window\.cdc.*?;\}", content)
             if match_injected_codeblock:
@@ -410,9 +409,7 @@ class Patcher:
             fh.seek(0)
             fh.write(content)
             fh.truncate()
-        logger.debug(
-            "patching took us {:.2f} seconds".format(time.perf_counter() - start)
-        )
+        logger.debug(f"patching took us {time.perf_counter() - start:.2f} seconds")
 
     @staticmethod
     def patch(browser_executable_path=None, driver_executable_path=None):
@@ -425,10 +422,7 @@ class Patcher:
         patcher.download_and_patch()
 
     def __repr__(self):
-        return "{0:s}({1:s})".format(
-            self.__class__.__name__,
-            self.driver_executable_path,
-        )
+        return f"{self.__class__.__name__:s}({self.driver_executable_path:s})"
 
     def __del__(self):
         if (

@@ -60,14 +60,14 @@ def _assert_fpscanner_clean(driver) -> None:
 
     assert title, f"Title should not be empty (body: {body[:300]!r})"
     assert body, f"Page body should not be empty (title: {title!r})"
-    assert (
-        "fpscanner" in title.lower()
-    ), f"Expected 'fpscanner' in title, got {title!r} (body: {body[:300]!r})"
+    assert "fpscanner" in title.lower(), (
+        f"Expected 'fpscanner' in title, got {title!r} (body: {body[:300]!r})"
+    )
 
     for marker in BLOCKED_MARKERS:
-        assert (
-            marker not in combined
-        ), f"Page blocked — found {marker!r} (title: {title!r}, body: {body[:400]!r})"
+        assert marker not in combined, (
+            f"Page blocked — found {marker!r} (title: {title!r}, body: {body[:400]!r})"
+        )
 
     failures = _fpscanner_failures(body)
     assert not failures, (

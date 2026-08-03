@@ -3,10 +3,10 @@ import logging
 import threading
 import time
 import traceback
-from collections.abc import Mapping, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from functools import wraps
 from pathlib import Path
-from typing import Any, Awaitable, Callable, List, Optional
+from typing import Any
 
 
 class Structure(dict):
@@ -71,7 +71,7 @@ class Structure(dict):
                 self[k] = v.strip()
 
 
-def timeout(seconds=3, on_timeout: Optional[Callable[[callable], Any]] = None):
+def timeout(seconds=3, on_timeout: Callable[[callable], Any] | None = None):
     def wrapper(func):
         @wraps(func)
         def wrapped(*args, **kwargs):
@@ -107,7 +107,7 @@ def test():
     def collector(
         driver: uc.Chrome,
         stop_event: threading.Event,
-        on_event_coro: Optional[Callable[[List[str]], Awaitable[Any]]] = None,
+        on_event_coro: Callable[[list[str]], Awaitable[Any]] | None = None,
         listen_events: Sequence = ("browser", "network", "performance"),
     ):
         def threaded(driver, stop_event, on_event_coro):
@@ -138,7 +138,7 @@ def test():
                                 continue
                         if log_lines and on_event_coro:
                             await on_event_coro(log_lines)
-                    except Exception as e:
+                    except Exception:
                         if logging.getLogger().getEffectiveLevel() <= 10:
                             traceback.print_exc()
 

@@ -4,8 +4,7 @@ import json
 import os
 from pathlib import Path
 
-from selenium.webdriver.chromium.options import \
-    ChromiumOptions as _ChromiumOptions
+from selenium.webdriver.chromium.options import ChromiumOptions as _ChromiumOptions
 
 
 class ChromeOptions(_ChromiumOptions):
@@ -68,7 +67,7 @@ class ChromeOptions(_ChromiumOptions):
 
             prefs_file = Path(str(default_path)) / "Preferences"
             if Path(prefs_file).exists():
-                with open(prefs_file, encoding="latin1", mode="r") as f:
+                with open(prefs_file, encoding="latin1") as f:
                     undot_prefs = self._merge_nested(json.load(f), undot_prefs)
 
             with open(prefs_file, encoding="latin1", mode="w") as f:
