@@ -2,17 +2,17 @@
 
 ![PyPI - Version](https://img.shields.io/pypi/v/undetected) ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/undetected) ![License](https://img.shields.io/pypi/l/undetected) ![Downloads](https://img.shields.io/pypi/dm/undetected)
 
-Undetectable selenium chromedriver.
+Undetectable Selenium ChromeDriver with built-in stealth evasions.
 
-**Warning:** The main logic of this project is to patch the ChromeDriver binary to avoid detection by anti-bot services. And this is achieved by modifying the chromedriver binary, just that. So please don't equivocate yourself by thinking that just by installing this package you will be 99.9% undetected, no you won't. If you are being detected you'll need to investigate by yourself what's causing it, it can be the package issue, but 70% of the time it's not, and if you still think its the package issue you can open an issue to explain by details whats going on.
+Patches the chromedriver binary (CDC / `test-type=webdriver`) and applies page-level stealth scripts on every `uc.Chrome()` session (CDP leak cleanup, `navigator.webdriver`, chrome runtime, iframes, WebGL, etc.).
 
-**Note:** This project is a fork of [`undetected-chromedriver`](https://github.com/ultrafunkamsterdam/undetected-chromedriver).
+**Note:** This project is a fork of [`undetected-chromedriver`](https://github.com/ultrafunkamsterdam/undetected-chromedriver). Results vary — binary + JS patches help, but they are not a guarantee against every bot detector.
 
 ## Installation
 
 ```bash
 pip install undetected
-````
+```
 
 ## Simple Usage
 
@@ -20,8 +20,16 @@ pip install undetected
 import undetected as uc
 
 driver = uc.Chrome()
-driver.get("https://example.com")
+driver.get("https://bot.sannysoft.com/")
 driver.quit()
+```
+
+Stealth runs automatically. For extra control:
+
+```python
+from undetected import apply_stealth
+
+apply_stealth(driver, languages=["en-US", "en"], fix_hairline=True)
 ```
 
 ## Example Usage with Multi-Processing (doesn't work great on Windows)
@@ -35,7 +43,7 @@ def worker(idx: int):
     driver = uc.Chrome(user_multi_procs=True)
     driver.get("https://example.com")
     driver.quit()
-    
+
 if __name__ == "__main__":
     Patcher.patch()  # patching a unique undetected chromedriver
 

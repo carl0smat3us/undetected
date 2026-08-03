@@ -376,7 +376,8 @@ class Patcher:
         driver_executable_path = driver_executable_path or self.driver_executable_path
         try:
             with io.open(driver_executable_path, "rb") as fh:
-                return fh.read().find(b"undetected chromedriver") != -1
+                content = fh.read()
+            return b"{/*uc*/" in content or b"undetected chromedriver" in content
         except FileNotFoundError:
             return False
 
@@ -385,27 +386,30 @@ class Patcher:
         logger.info("patching driver executable %s" % self.driver_executable_path)
         with io.open(self.driver_executable_path, "r+b") as fh:
             content = fh.read()
-            # match_injected_codeblock = re.search(rb"{window.*;}", content)
             match_injected_codeblock = re.search(rb"\{window\.cdc.*?;\}", content)
             if match_injected_codeblock:
                 target_bytes = match_injected_codeblock[0]
-                new_target_bytes = (
-                    b'{console.log("undetected chromedriver 1337!")}'.ljust(
-                        len(target_bytes), b" "
-                    )
-                )
-                new_content = content.replace(target_bytes, new_target_bytes)
-                if new_content == content:
-                    logger.warning(
-                        "something went wrong patching the driver binary. could not find injection code block"
-                    )
+                # Quiet NOP with a short marker for is_binary_patched().
+                marker = b"{/*uc*/"
+                if len(target_bytes) < len(marker) + 1:
+                    new_target_bytes = b" " * len(target_bytes)
                 else:
-                    logger.debug(
-                        "found block:\n%s\nreplacing with:\n%s"
-                        % (target_bytes, new_target_bytes)
+                    new_target_bytes = (
+                        marker + (b" " * (len(target_bytes) - len(marker) - 1)) + b"}"
                     )
-                fh.seek(0)
-                fh.write(new_content)
+                content = content.replace(target_bytes, new_target_bytes, 1)
+            else:
+                logger.warning(
+                    "something went wrong patching the driver binary. could not find injection code block"
+                )
+
+            test_type = b"test-type=webdriver"
+            if test_type in content:
+                content = content.replace(test_type, b" " * len(test_type))
+
+            fh.seek(0)
+            fh.write(content)
+            fh.truncate()
         logger.debug(
             "patching took us {:.2f} seconds".format(time.perf_counter() - start)
         )

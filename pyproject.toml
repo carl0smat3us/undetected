@@ -1,6 +1,6 @@
 [project]
 name = "undetected"
-version = "0.0.13"
+version = "0.0.14"
 description = "Selenium.webdriver.Chrome replacement with compatibility for Brave, and other Chromium based browsers. Not triggered by CloudFlare/Imperva/hCaptcha and such. NOTE: results may vary due to many factors. No guarantees are given, except for ongoing efforts in understanding detection algorithms."
 authors = [
   { name="Carlos Mateus", email="carlosmateus@outlook.be" },
@@ -12,6 +12,12 @@ classifiers = [
     "Programming Language :: Python :: 3.10"
 ]
 requires-python = ">=3.10,<4"
+
+[tool.poetry]
+packages = [{ include = "undetected" }]
+include = [
+    "undetected/stealth/js/*.js",
+]
 
 [tool.poetry.dependencies]
 selenium = "^4.39.0"
@@ -29,6 +35,8 @@ taskipy = "^1.14.1"
 
 [tool.taskipy.tasks]
 lint = "black undetected/ && isort undetected/ && black tests/ && isort tests/"
+test = "pytest tests/test_basic.py tests/test_multiproc.py -q"
+test-browser = "pytest tests/test_rebrowser.py tests/test_fpscanner.py -q"
 
 [tool.poetry.urls]
 Issues = "https://github.com/carl0smat3us/undetected/issues"
