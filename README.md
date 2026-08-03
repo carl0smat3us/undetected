@@ -2,11 +2,11 @@
 
 ![PyPI - Version](https://img.shields.io/pypi/v/undetected) ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/undetected) ![License](https://img.shields.io/pypi/l/undetected) ![Downloads](https://img.shields.io/pypi/dm/undetected)
 
-Undetectable Selenium ChromeDriver with built-in stealth evasions.
+A Selenium Chrome drop-in that hardens automation against common bot checks.
 
-Patches the chromedriver binary (CDC / `test-type=webdriver`) and applies page-level stealth scripts on every `uc.Chrome()` session (CDP leak cleanup, `navigator.webdriver`, chrome runtime, iframes, WebGL, etc.).
+It patches the chromedriver binary (CDC / `test-type=webdriver`) and applies page-level stealth scripts on every `uc.Chrome()` session (CDP leak cleanup, `navigator.webdriver`, chrome runtime, iframes, WebGL, and more).
 
-**Note:** This project is a fork of [`undetected-chromedriver`](https://github.com/ultrafunkamsterdam/undetected-chromedriver). Results vary — binary + JS patches help, but they are not a guarantee against every bot detector.
+**Note:** Fork of [`undetected-chromedriver`](https://github.com/ultrafunkamsterdam/undetected-chromedriver). Results vary - these patches help, but they are not a guarantee against every detector.
 
 ## Installation
 
