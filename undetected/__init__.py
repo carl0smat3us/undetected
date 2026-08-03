@@ -19,10 +19,18 @@ from .dprocess import start_detached
 from .options import ChromeOptions
 from .patcher import Patcher
 from .reactor import Reactor
+from .stealth import apply_stealth
 from .utils.info import IS_POSIX
 from .webelement import UCWebElement, WebElement
 
-__all__ = ("Chrome", "ChromeOptions", "Patcher", "Reactor", "CDP")
+__all__ = (
+    "Chrome",
+    "ChromeOptions",
+    "Patcher",
+    "Reactor",
+    "CDP",
+    "apply_stealth",
+)
 
 logger = logging.getLogger("uc")
 logger.setLevel(logging.getLogger().getEffectiveLevel())
@@ -440,150 +448,13 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
         else:
             self._web_element_cls = WebElement
 
-        if headless or getattr(options, "headless", None):
-            self._configure_headless()
+        langs = [part.strip() for part in str(language).split(",") if part.strip()]
+        if not langs:
+            langs = ["en-US", "en"]
+        elif len(langs) == 1 and "-" in langs[0]:
+            langs = [langs[0], langs[0].split("-", 1)[0]]
 
-    def _configure_headless(self):
-        orig_get = self.get
-        logger.info("setting properties for headless")
-
-        def get_wrapped(*args, **kwargs):
-            if self.execute_script("return navigator.webdriver"):
-                logger.info("patch navigator.webdriver")
-                self.execute_cdp_cmd(
-                    "Page.addScriptToEvaluateOnNewDocument",
-                    {
-                        "source": """
-
-                           Object.defineProperty(window, "navigator", {
-                                Object.defineProperty(window, "navigator", {
-                                  value: new Proxy(navigator, {
-                                    has: (target, key) => (key === "webdriver" ? false : key in target),
-                                    get: (target, key) =>
-                                      key === "webdriver"
-                                        ? false
-                                        : typeof target[key] === "function"
-                                        ? target[key].bind(target)
-                                        : target[key],
-                                  }),
-                                });
-                    """
-                    },
-                )
-
-                logger.info("patch user-agent string")
-                self.execute_cdp_cmd(
-                    "Network.setUserAgentOverride",
-                    {
-                        "userAgent": self.execute_script(
-                            "return navigator.userAgent"
-                        ).replace("Headless", "")
-                    },
-                )
-                self.execute_cdp_cmd(
-                    "Page.addScriptToEvaluateOnNewDocument",
-                    {
-                        "source": """
-                            Object.defineProperty(navigator, 'maxTouchPoints', {get: () => 1});
-                            Object.defineProperty(navigator.connection, 'rtt', {get: () => 100});
-
-                            // https://github.com/microlinkhq/browserless/blob/master/packages/goto/src/evasions/chrome-runtime.js
-                            window.chrome = {
-                                app: {
-                                    isInstalled: false,
-                                    InstallState: {
-                                        DISABLED: 'disabled',
-                                        INSTALLED: 'installed',
-                                        NOT_INSTALLED: 'not_installed'
-                                    },
-                                    RunningState: {
-                                        CANNOT_RUN: 'cannot_run',
-                                        READY_TO_RUN: 'ready_to_run',
-                                        RUNNING: 'running'
-                                    }
-                                },
-                                runtime: {
-                                    OnInstalledReason: {
-                                        CHROME_UPDATE: 'chrome_update',
-                                        INSTALL: 'install',
-                                        SHARED_MODULE_UPDATE: 'shared_module_update',
-                                        UPDATE: 'update'
-                                    },
-                                    OnRestartRequiredReason: {
-                                        APP_UPDATE: 'app_update',
-                                        OS_UPDATE: 'os_update',
-                                        PERIODIC: 'periodic'
-                                    },
-                                    PlatformArch: {
-                                        ARM: 'arm',
-                                        ARM64: 'arm64',
-                                        MIPS: 'mips',
-                                        MIPS64: 'mips64',
-                                        X86_32: 'x86-32',
-                                        X86_64: 'x86-64'
-                                    },
-                                    PlatformNaclArch: {
-                                        ARM: 'arm',
-                                        MIPS: 'mips',
-                                        MIPS64: 'mips64',
-                                        X86_32: 'x86-32',
-                                        X86_64: 'x86-64'
-                                    },
-                                    PlatformOs: {
-                                        ANDROID: 'android',
-                                        CROS: 'cros',
-                                        LINUX: 'linux',
-                                        MAC: 'mac',
-                                        OPENBSD: 'openbsd',
-                                        WIN: 'win'
-                                    },
-                                    RequestUpdateCheckStatus: {
-                                        NO_UPDATE: 'no_update',
-                                        THROTTLED: 'throttled',
-                                        UPDATE_AVAILABLE: 'update_available'
-                                    }
-                                }
-                            }
-
-                            // https://github.com/microlinkhq/browserless/blob/master/packages/goto/src/evasions/navigator-permissions.js
-                            if (!window.Notification) {
-                                window.Notification = {
-                                    permission: 'denied'
-                                }
-                            }
-
-                            const originalQuery = window.navigator.permissions.query
-                            window.navigator.permissions.__proto__.query = parameters =>
-                                parameters.name === 'notifications'
-                                    ? Promise.resolve({ state: window.Notification.permission })
-                                    : originalQuery(parameters)
-
-                            const oldCall = Function.prototype.call
-                            function call() {
-                                return oldCall.apply(this, arguments)
-                            }
-                            Function.prototype.call = call
-
-                            const nativeToStringFunctionString = Error.toString().replace(/Error/g, 'toString')
-                            const oldToString = Function.prototype.toString
-
-                            function functionToString() {
-                                if (this === window.navigator.permissions.query) {
-                                    return 'function query() { [native code] }'
-                                }
-                                if (this === functionToString) {
-                                    return nativeToStringFunctionString
-                                }
-                                return oldCall.call(oldToString, this)
-                            }
-                            // eslint-disable-next-line
-                            Function.prototype.toString = functionToString
-                            """
-                    },
-                )
-            return orig_get(*args, **kwargs)
-
-        self.get = get_wrapped
+        apply_stealth(self, languages=langs, fix_hairline=True)
 
     def get(self, url):
         return super().get(url)
