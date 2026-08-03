@@ -46,7 +46,8 @@ class Patcher:
         d = "~/.undetected"
 
     if platform.endswith("win32"):
-        platform_name = "win32"
+        # Chrome for Testing ships win64 builds for amd64 Windows.
+        platform_name = "win64" if sys.maxsize > 2**32 else "win32"
         exe_name %= ".exe"
     if platform.endswith(("linux", "linux2")):
         platform_name = "linux64"
@@ -93,8 +94,10 @@ class Patcher:
         self.full_version = None
 
         if self.version_main <= 114:
-            logger.error("Unsupported browser version: %s", self.version_main)
-            os._exit(1)
+            raise RuntimeError(
+                f"Unsupported browser version: {self.version_main}. "
+                "Install a current Google Chrome and retry."
+            )
 
         if not Path(self.data_path).exists():
             os.makedirs(self.data_path, exist_ok=True)
@@ -339,20 +342,26 @@ class Patcher:
     def kill_all_instances(path):
         if IS_POSIX:
             cmd = f"pidof {path} >/dev/null && kill -9 $(pidof {path}) || true"
+            exit_code = subprocess.run(
+                cmd,
+                shell=True,
+                capture_output=True,
+                text=True,
+            )
         else:
-            cmd = f"taskkill /f /im {path} >nul 2>&1"
+            # /IM expects an image name, not a full path.
+            image = Path(path).name if path else "chromedriver.exe"
+            exit_code = subprocess.run(
+                ["taskkill", "/F", "/IM", image, "/T"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
 
-        exit_code = subprocess.run(
-            cmd,
-            shell=True,
-            capture_output=True,
-            text=True,
-        )
-
-        if exit_code == 0:
+        if getattr(exit_code, "returncode", 1) == 0:
             logger.debug("Killed running instances of %s", path)
         else:
-            logger.error(
+            logger.debug(
                 "Failed to kill running instances of %s (exit code: %s)",
                 path,
                 exit_code,
