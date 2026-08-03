@@ -1,6 +1,6 @@
 [project]
 name = "undetected"
-version = "0.0.14"
+version = "1.0.0"
 description = "Selenium Chrome drop-in with chromedriver patching and page-level stealth evasions."
 authors = [
     { name = "Carlos Mateus", email = "carlosmateus@outlook.be" },
