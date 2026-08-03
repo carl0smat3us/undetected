@@ -4,6 +4,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 from pathlib import Path
@@ -396,12 +397,20 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
                 options.binary_location, *options.arguments
             )
         else:
+            # PIPE for stdout/stderr deadlocks Chrome on Windows once the
+            # buffer fills (chromedriver then reports "chrome not reachable").
+            popen_kwargs = {
+                "stdin": subprocess.DEVNULL,
+                "stdout": subprocess.DEVNULL,
+                "stderr": subprocess.DEVNULL,
+                "close_fds": IS_POSIX,
+            }
+            if sys.platform == "win32":
+                # Don't flash a console; don't inherit Flet/GUI job weirdness.
+                popen_kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
             browser = subprocess.Popen(
                 [options.binary_location, *options.arguments],
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                close_fds=IS_POSIX,
+                **popen_kwargs,
             )
             self.browser_pid = browser.pid
 

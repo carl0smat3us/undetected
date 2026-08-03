@@ -80,25 +80,79 @@ def get_chrome_version(exe_path):
         return None
 
     try:
-        if sys.platform != "win32":
-            command = [exe_path, "--version"]
-        else:
+        if sys.platform == "win32":
+            # Prefer Win32 APIs — PowerShell is flaky under GUI hosts, and
+            # `chrome.exe --version` hangs on Windows (opens a window).
+            ver = _win_file_version(str(exe_path))
+            if ver:
+                return ver
             command = [
                 "powershell",
+                "-NoProfile",
+                "-NonInteractive",
                 "-Command",
-                f"& {{(Get-Item '{exe_path}').VersionInfo.FileVersion}}",
+                f"(Get-Item -LiteralPath '{exe_path}').VersionInfo.FileVersion",
             ]
+        else:
+            command = [exe_path, "--version"]
 
         output = subprocess.check_output(
             command,
             stderr=subprocess.DEVNULL,
             text=True,
+            timeout=15,
         )
 
         match = re.search(r"\d+\.\d+\.\d+\.\d+", output)
         return match.group(0) if match else None
 
     except (subprocess.SubprocessError, OSError):
+        return None
+
+
+def _win_file_version(exe_path: str) -> str | None:
+    try:
+        import ctypes
+
+        size = ctypes.windll.version.GetFileVersionInfoSizeW(exe_path, None)
+        if not size:
+            return None
+        buf = ctypes.create_string_buffer(size)
+        if not ctypes.windll.version.GetFileVersionInfoW(exe_path, 0, size, buf):
+            return None
+        p = ctypes.c_void_p()
+        length = ctypes.c_uint()
+        if not ctypes.windll.version.VerQueryValueW(
+            buf, "\\", ctypes.byref(p), ctypes.byref(length)
+        ):
+            return None
+
+        class _VS_FIXEDFILEINFO(ctypes.Structure):
+            _fields_ = [
+                ("dwSignature", ctypes.c_uint32),
+                ("dwStrucVersion", ctypes.c_uint32),
+                ("dwFileVersionMS", ctypes.c_uint32),
+                ("dwFileVersionLS", ctypes.c_uint32),
+                ("dwProductVersionMS", ctypes.c_uint32),
+                ("dwProductVersionLS", ctypes.c_uint32),
+                ("dwFileFlagsMask", ctypes.c_uint32),
+                ("dwFileFlags", ctypes.c_uint32),
+                ("dwFileOS", ctypes.c_uint32),
+                ("dwFileType", ctypes.c_uint32),
+                ("dwFileSubtype", ctypes.c_uint32),
+                ("dwFileDateMS", ctypes.c_uint32),
+                ("dwFileDateLS", ctypes.c_uint32),
+            ]
+
+        info = ctypes.cast(p, ctypes.POINTER(_VS_FIXEDFILEINFO)).contents
+        major = info.dwFileVersionMS >> 16
+        minor = info.dwFileVersionMS & 0xFFFF
+        build = info.dwFileVersionLS >> 16
+        patch = info.dwFileVersionLS & 0xFFFF
+        if major <= 0:
+            return None
+        return f"{major}.{minor}.{build}.{patch}"
+    except Exception:
         return None
 
 
