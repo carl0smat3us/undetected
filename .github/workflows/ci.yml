@@ -27,24 +27,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Chrome
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Chrome
         uses: browser-actions/setup-chrome@v1
         with:
           chrome-version: stable
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install Poetry
-        run: pip install poetry
-
       - name: Install dependencies
-        run: poetry install --with dev
+        run: uv sync --group dev
 
       - name: Unit tests
-        run: poetry run task test
+        run: uv run task test
 
       - name: Browser tests
-        run: poetry run task test-browser
+        run: uv run task test-browser
