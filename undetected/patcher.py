@@ -13,6 +13,7 @@ import string
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import zipfile
 from contextlib import contextmanager
@@ -30,6 +31,7 @@ logger = logging.getLogger(__name__)
 
 class Patcher:
     lock = Lock()
+    _thread_lock = threading.RLock()
     exe_name = "chromedriver%s"
 
     platform = sys.platform
@@ -373,12 +375,19 @@ class Patcher:
 
     def is_binary_patched(self, driver_executable_path=None):
         driver_executable_path = driver_executable_path or self.driver_executable_path
-        try:
-            with open(driver_executable_path, "rb") as fh:
-                content = fh.read()
-            return b"{/*uc*/" in content or b"undetected chromedriver" in content
-        except FileNotFoundError:
-            return False
+        for attempt in range(15):
+            try:
+                with open(driver_executable_path, "rb") as fh:
+                    content = fh.read()
+                return b"{/*uc*/" in content or b"undetected chromedriver" in content
+            except FileNotFoundError:
+                return False
+            except PermissionError:
+                # Windows often denies reading a chromedriver.exe that is running.
+                time.sleep(0.1)
+                if attempt == 14 and Path(driver_executable_path).is_file():
+                    return True
+        return False
 
     def patch_exe(self):
         start = time.perf_counter()
@@ -424,45 +433,56 @@ class Patcher:
     @classmethod
     @contextmanager
     def _cross_process_lock(cls):
-        """Exclusive lock shared by threads and spawn/fork processes."""
+        """
+        Exclusive lock shared by threads and processes.
+        Uses flock on POSIX and an atomic mkdir lock on Windows
+        (msvcrt.locking is unreliable across threads).
+        """
         data = pathlib.Path(cls.data_path)
         data.mkdir(parents=True, exist_ok=True)
-        lock_path = data / ".patch.lock"
-        fh = open(lock_path, "a+b")
-        try:
-            if IS_POSIX:
-                import fcntl
 
+        if IS_POSIX:
+            import fcntl
+
+            lock_path = data / ".patch.lock"
+            fh = open(lock_path, "a+b")
+            try:
                 fcntl.flock(fh.fileno(), fcntl.LOCK_EX)
-            else:
-                import msvcrt
+                yield
+            finally:
+                try:
+                    fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+                except OSError:
+                    pass
+                fh.close()
+            return
 
-                fh.seek(0)
-                if fh.read(1) == b"":
-                    fh.write(b"0")
-                    fh.flush()
-                while True:
-                    try:
-                        fh.seek(0)
-                        msvcrt.locking(fh.fileno(), msvcrt.LK_LOCK, 1)
-                        break
-                    except OSError:
-                        time.sleep(0.05)
+        # Windows: mkdir is atomic; avoid msvcrt.locking (Errno 13 under threads).
+        lock_dir = data / ".patch.lock.d"
+        deadline = time.time() + 120
+        while True:
+            try:
+                os.mkdir(lock_dir)
+                break
+            except FileExistsError:
+                if time.time() > deadline:
+                    raise TimeoutError(
+                        "timed out waiting for chromedriver patch lock"
+                    ) from None
+                try:
+                    if time.time() - lock_dir.stat().st_mtime > 300:
+                        os.rmdir(lock_dir)
+                        continue
+                except OSError:
+                    pass
+                time.sleep(0.05)
+        try:
             yield
         finally:
             try:
-                if IS_POSIX:
-                    import fcntl
-
-                    fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
-                else:
-                    import msvcrt
-
-                    fh.seek(0)
-                    msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)
+                os.rmdir(lock_dir)
             except OSError:
                 pass
-            fh.close()
 
     @classmethod
     def ensure_patched(cls, browser_executable_path=None, driver_executable_path=None):
@@ -470,26 +490,27 @@ class Patcher:
         Make sure a shared patched chromedriver exists.
         Safe across threads and processes; only the first caller downloads/patches.
         """
-        with cls._cross_process_lock():
-            data = pathlib.Path(cls.data_path)
-            data.mkdir(parents=True, exist_ok=True)
-            files = [
-                f
-                for f in data.glob("*chromedriver*")
-                if "unpatched" not in f.name.lower()
-            ]
-            probe = cls(
-                browser_executable_path=browser_executable_path,
-                driver_executable_path=driver_executable_path,
-                user_multi_procs=True,
-                for_patch=True,
-            )
-            if files:
-                most_recent = max(files, key=lambda f: f.stat().st_mtime)
-                if probe.is_binary_patched(most_recent):
-                    return
-            probe.cleanup_unused_files()
-            probe.download_and_patch()
+        with cls._thread_lock:
+            with cls._cross_process_lock():
+                data = pathlib.Path(cls.data_path)
+                data.mkdir(parents=True, exist_ok=True)
+                files = [
+                    f
+                    for f in data.glob("*chromedriver*")
+                    if "unpatched" not in f.name.lower()
+                ]
+                probe = cls(
+                    browser_executable_path=browser_executable_path,
+                    driver_executable_path=driver_executable_path,
+                    user_multi_procs=True,
+                    for_patch=True,
+                )
+                if files:
+                    most_recent = max(files, key=lambda f: f.stat().st_mtime)
+                    if probe.is_binary_patched(most_recent):
+                        return
+                probe.cleanup_unused_files()
+                probe.download_and_patch()
 
     def __repr__(self):
         return f"{self.__class__.__name__:s}({self.driver_executable_path:s})"
