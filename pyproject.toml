@@ -56,4 +56,4 @@ known-first-party = ["undetected"]
 lint = "ruff format undetected/ tests/ && ruff check --fix undetected/ tests/"
 lint-check = "ruff format --check undetected/ tests/ && ruff check undetected/ tests/"
 test = "pytest tests/test_basic.py tests/test_multiproc.py -q"
-test-browser = "pytest tests/test_rebrowser.py tests/test_fpscanner.py -q"
+test-browser = "pytest tests/detection/ -q"

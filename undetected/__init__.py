@@ -189,19 +189,10 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
              when running as root without using --no-sandbox flag.
 
         user_multi_procs:
-            set to true when you are using multithreads/multiprocessing
-            ensures not all processes are trying to modify a binary which is in use by another.
-            for this to work.
-
-            YOU SHOULD CALL THE METHOD 'Patcher.patch()' TO ENSURE THAT YOU HAVE AT LEAST ONE UNDETECTED CHROMEDRIVER BINNARY AVAILABLE.
-            --start script--
-            from undetected.patcher import Patcher
-
-            # outside of the multithreading/multiprocessing implementation
-            Patcher.patch()
-
-            # multithreading/multiprocessing code ...
-            --end script--
+            set to true when you are using multi-threading (or multi-processing).
+            Shares one patched chromedriver and skips deleting it on quit so
+            concurrent sessions do not fight over the binary. The first Chrome()
+            call patches automatically — no Patcher.patch() needed.
         """
 
         finalize(self, self._ensure_close, self)
@@ -214,7 +205,16 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
             user_multi_procs=user_multi_procs,
         )
 
-        if not user_multi_procs:
+        if self.patcher._using_custom_driver:
+            # Patch the caller-supplied binary in place; do not download another.
+            if not self.patcher.is_binary_patched():
+                self.patcher.patch_exe()
+        elif user_multi_procs:
+            Patcher.ensure_patched(
+                browser_executable_path=browser_executable_path,
+                driver_executable_path=driver_executable_path,
+            )
+        else:
             self.patcher.patch(
                 browser_executable_path=browser_executable_path,
                 driver_executable_path=driver_executable_path,

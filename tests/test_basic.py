@@ -11,7 +11,7 @@ def test_basic():
 
     driver = uc.Chrome(options=options, headless=True)
 
-    driver.get("https://example.com")
+    driver.get("https://www.google.com/")
     title = driver.title
 
     driver.quit()
@@ -34,7 +34,7 @@ def test_basic_manual_driver():
         options=options, headless=True, driver_executable_path=driver_path
     )
 
-    driver.get("https://example.com")
+    driver.get("https://www.google.com/")
     title = driver.title
 
     driver.quit()

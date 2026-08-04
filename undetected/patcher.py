@@ -15,6 +15,7 @@ import sys
 import tempfile
 import time
 import zipfile
+from contextlib import contextmanager
 from multiprocessing import Lock
 from pathlib import Path
 from urllib.request import urlopen
@@ -130,15 +131,14 @@ class Patcher:
         p = pathlib.Path(self.data_path)
 
         with self.lock:
-            files = list(p.glob("*chromedriver*"))
+            files = [
+                f for f in p.glob("*chromedriver*") if "unpatched" not in f.name.lower()
+            ]
 
             if not files:
                 raise Exception(
-                    """
-                    No undetected chromedriver binary were found.
-
-                    Call `Patcher.patch()` outside of multiprocessing/threading implementation.
-                    """
+                    "No patched chromedriver binary was found under %s."
+                    % self.data_path
                 )
 
             try:
@@ -420,6 +420,76 @@ class Patcher:
         )
         patcher.cleanup_unused_files()
         patcher.download_and_patch()
+
+    @classmethod
+    @contextmanager
+    def _cross_process_lock(cls):
+        """Exclusive lock shared by threads and spawn/fork processes."""
+        data = pathlib.Path(cls.data_path)
+        data.mkdir(parents=True, exist_ok=True)
+        lock_path = data / ".patch.lock"
+        fh = open(lock_path, "a+b")
+        try:
+            if IS_POSIX:
+                import fcntl
+
+                fcntl.flock(fh.fileno(), fcntl.LOCK_EX)
+            else:
+                import msvcrt
+
+                fh.seek(0)
+                if fh.read(1) == b"":
+                    fh.write(b"0")
+                    fh.flush()
+                while True:
+                    try:
+                        fh.seek(0)
+                        msvcrt.locking(fh.fileno(), msvcrt.LK_LOCK, 1)
+                        break
+                    except OSError:
+                        time.sleep(0.05)
+            yield
+        finally:
+            try:
+                if IS_POSIX:
+                    import fcntl
+
+                    fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+                else:
+                    import msvcrt
+
+                    fh.seek(0)
+                    msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)
+            except OSError:
+                pass
+            fh.close()
+
+    @classmethod
+    def ensure_patched(cls, browser_executable_path=None, driver_executable_path=None):
+        """
+        Make sure a shared patched chromedriver exists.
+        Safe across threads and processes; only the first caller downloads/patches.
+        """
+        with cls._cross_process_lock():
+            data = pathlib.Path(cls.data_path)
+            data.mkdir(parents=True, exist_ok=True)
+            files = [
+                f
+                for f in data.glob("*chromedriver*")
+                if "unpatched" not in f.name.lower()
+            ]
+            probe = cls(
+                browser_executable_path=browser_executable_path,
+                driver_executable_path=driver_executable_path,
+                user_multi_procs=True,
+                for_patch=True,
+            )
+            if files:
+                most_recent = max(files, key=lambda f: f.stat().st_mtime)
+                if probe.is_binary_patched(most_recent):
+                    return
+            probe.cleanup_unused_files()
+            probe.download_and_patch()
 
     def __repr__(self):
         return f"{self.__class__.__name__:s}({self.driver_executable_path:s})"

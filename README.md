@@ -35,43 +35,18 @@ driver.get("https://bot.sannysoft.com/")
 driver.quit()
 ```
 
-## Example Usage with Multi-Processing (doesn't work great on Windows)
+## Multi-Threading
 
 ```python
 import undetected as uc
-from undetected.patcher import Patcher
-from multiprocessing import Process
-
-def worker(idx: int):
-    driver = uc.Chrome(user_multi_procs=True)
-    driver.get("https://example.com")
-    driver.quit()
-
-if __name__ == "__main__":
-    Patcher.patch()  # patching a unique undetected chromedriver
-
-    processes = [Process(target=worker, args=(i,)) for i in range(4)]
-    for p in processes:
-        p.start()
-    for p in processes:
-        p.join()
-```
-
-## Example Usage with Multi-Threading
-
-```python
-import undetected as uc
-from undetected.patcher import Patcher
 import threading
 
 def worker(idx: int):
     driver = uc.Chrome(user_multi_procs=True)
-    driver.get("https://example.com")
+    driver.get("https://www.google.com/")
     driver.quit()
 
 if __name__ == "__main__":
-    Patcher.patch()  # patching a unique undetected chromedriver
-
     threads = [threading.Thread(target=worker, args=(i,)) for i in range(4)]
     for t in threads:
         t.start()
