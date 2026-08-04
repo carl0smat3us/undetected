@@ -4,7 +4,7 @@
 
 A Selenium Chrome drop-in that hardens automation against common bot checks.
 
-It patches the chromedriver binary (CDC / `test-type=webdriver`) and applies page-level stealth scripts on every `uc.Chrome()` session (CDP leak cleanup, `navigator.webdriver`, chrome runtime, iframes, WebGL, and more).
+It patches the chromedriver binary (CDC / `test-type=webdriver`) and injects page-level scripts on every `uc.Chrome()` session (CDP leak cleanup, `navigator.webdriver`, chrome runtime, iframes, WebGL, and more).
 
 **Note:** Fork of [`undetected-chromedriver`](https://github.com/ultrafunkamsterdam/undetected-chromedriver). Results vary - these patches help, but they are not a guarantee against every detector.
 
@@ -24,12 +24,15 @@ driver.get("https://bot.sannysoft.com/")
 driver.quit()
 ```
 
-Stealth runs automatically. For extra control:
-
 ```python
-from undetected import apply_stealth
+import undetected as uc
 
-apply_stealth(driver, languages=["en-US", "en"], fix_hairline=True)
+options = uc.ChromeOptions()
+options.languages = ["fr-FR", "fr"]
+
+driver = uc.Chrome(options=options)
+driver.get("https://bot.sannysoft.com/")
+driver.quit()
 ```
 
 ## Example Usage with Multi-Processing (doesn't work great on Windows)

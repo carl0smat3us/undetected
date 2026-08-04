@@ -1,7 +1,10 @@
 # this module is part of undetected
 
+from __future__ import annotations
+
 import json
 import os
+import re
 from pathlib import Path
 
 from selenium.webdriver.chromium.options import ChromiumOptions as _ChromiumOptions
@@ -10,6 +13,7 @@ from selenium.webdriver.chromium.options import ChromiumOptions as _ChromiumOpti
 class ChromeOptions(_ChromiumOptions):
     _session = None
     _user_data_dir = None
+    _languages: list[str] | None = None
 
     @property
     def user_data_dir(self):
@@ -28,6 +32,41 @@ class ChromeOptions(_ChromiumOptions):
             if it does not exist, a new profile will be created at given location
         """
         self._user_data_dir = Path(path).resolve()
+
+    @property
+    def languages(self) -> list[str] | None:
+        """Browser / navigator languages, e.g. ``["fr-FR", "fr"]``."""
+        return self._languages
+
+    @languages.setter
+    def languages(self, value: list[str] | tuple[str, ...] | str | None):
+        if value is None:
+            self._languages = None
+            return
+
+        if isinstance(value, str):
+            parts = [
+                chunk.strip().split(";", 1)[0].strip()
+                for chunk in value.split(",")
+                if chunk.strip()
+            ]
+        else:
+            parts = [
+                str(item).strip().split(";", 1)[0].strip()
+                for item in value
+                if str(item).strip()
+            ]
+
+        self._languages = parts or None
+        self._sync_lang_argument()
+
+    def _sync_lang_argument(self) -> None:
+        """Keep ``--lang`` in sync with ``options.languages``."""
+        self.arguments[:] = [
+            arg for arg in self.arguments if not re.match(r"(?:--)?lang(?:[ =]|$)", arg)
+        ]
+        if self._languages:
+            self.add_argument("--lang=%s" % ",".join(self._languages))
 
     @staticmethod
     def _undot_key(key, value):

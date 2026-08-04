@@ -48,7 +48,29 @@ def _user_agent_override(
     driver.execute_cdp_cmd("Network.setUserAgentOverride", override)
 
 
-def apply_stealth(
+def normalize_languages(raw: list[str] | tuple[str, ...] | str | None) -> list[str]:
+    """Normalize language tags for navigator.languages / Accept-Language."""
+    parts: list[str] = []
+    if isinstance(raw, (list, tuple)):
+        for item in raw:
+            tag = str(item).strip().split(";", 1)[0].strip()
+            if tag:
+                parts.append(tag)
+    elif raw:
+        for chunk in str(raw).split(","):
+            tag = chunk.strip().split(";", 1)[0].strip()
+            if tag:
+                parts.append(tag)
+
+    if not parts:
+        return ["en-US", "en"]
+    if len(parts) == 1 and "-" in parts[0]:
+        primary = parts[0]
+        return [primary, primary.split("-", 1)[0]]
+    return parts
+
+
+def inject(
     driver,
     *,
     user_agent: str | None = None,
@@ -61,10 +83,9 @@ def apply_stealth(
     run_on_insecure_origins: bool = False,
     custom_js: str | None = None,
 ) -> None:
-    if languages is None:
-        languages = ["en-US", "en"]
-
-    ua_languages = ",".join(languages)
+    """Inject page-level scripts via CDP (called by Chrome.__init__)."""
+    langs = normalize_languages(languages)
+    ua_languages = ",".join(langs)
 
     _eval_js(driver, "utils.js")
     _eval_js(driver, "navigator.userAgent.js")
@@ -80,7 +101,7 @@ def apply_stealth(
     _eval_js(driver, "iframe.contentWindow.js")
     _eval_js(driver, "iframe.webdriver.js")
     _eval_js(driver, "media.codecs.js")
-    _eval_js(driver, "navigator.languages.js", languages)
+    _eval_js(driver, "navigator.languages.js", langs)
     _eval_js(driver, "navigator.permissions.js")
     _eval_js(driver, "navigator.plugins.js")
     _eval_js(driver, "navigator.vendor.js", vendor)

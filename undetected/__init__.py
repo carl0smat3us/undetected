@@ -16,10 +16,11 @@ import selenium.webdriver.remote.command
 
 from .cdp import CDP
 from .dprocess import start_detached
+from .inject import inject as _inject
+from .inject import normalize_languages
 from .options import ChromeOptions
 from .patcher import Patcher
 from .reactor import Reactor
-from .stealth import apply_stealth
 from .utils.info import IS_POSIX
 from .webelement import UCWebElement, WebElement
 
@@ -29,7 +30,6 @@ __all__ = (
     "Patcher",
     "Reactor",
     "CDP",
-    "apply_stealth",
 )
 
 logger = logging.getLogger("uc")
@@ -261,13 +261,17 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
 
         language, keep_user_data_dir = None, bool(user_data_dir)
 
+        # Prefer explicit options.languages over a raw --lang argument.
+        if getattr(options, "languages", None):
+            language = ",".join(options.languages)
+
         # see if a custom user profile is specified in options
-        for arg in options.arguments:
+        for arg in list(options.arguments):
             if any([_ in arg for _ in ("--headless", "headless")]):
                 options.arguments.remove(arg)
                 options.headless = True
 
-            if "lang" in arg:
+            if language is None and "lang" in arg:
                 m = re.search("(?:--)?lang(?:[ =])?(.*)", arg)
                 try:
                     if not m:
@@ -336,7 +340,17 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
             if not language:
                 language = "en-US"
 
-        options.add_argument("--lang=%s" % language)
+        # Keep options.languages + --lang aligned without duplicating the arg.
+        langs = normalize_languages(language)
+        if hasattr(options, "languages"):
+            options.languages = langs
+        else:
+            options.arguments[:] = [
+                a
+                for a in options.arguments
+                if not re.match(r"(?:--)?lang(?:[ =]|$)", a)
+            ]
+            options.add_argument("--lang=%s" % ",".join(langs))
 
         options.binary_location = self.patcher.browser_executable_path
 
@@ -448,13 +462,8 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
         else:
             self._web_element_cls = WebElement
 
-        langs = [part.strip() for part in str(language).split(",") if part.strip()]
-        if not langs:
-            langs = ["en-US", "en"]
-        elif len(langs) == 1 and "-" in langs[0]:
-            langs = [langs[0], langs[0].split("-", 1)[0]]
-
-        apply_stealth(self, languages=langs, fix_hairline=True)
+        langs = normalize_languages(getattr(options, "languages", None) or language)
+        _inject(self, languages=langs, fix_hairline=True)
 
     def get(self, url):
         return super().get(url)
