@@ -5,7 +5,7 @@ description = "Selenium Chrome drop-in with chromedriver patching and automatic 
 authors = [
     { name = "lovebrownie", email = "91576261+lovebrownie@users.noreply.github.com" },
 ]
-license = "GPL-3.0"
+license = { file = "LICENSE" }
 readme = "README.md"
 requires-python = ">=3.10,<4"
 classifiers = [
