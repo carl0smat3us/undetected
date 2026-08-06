@@ -1,7 +1,5 @@
 # Undetected
 
-![PyPI - Version](https://img.shields.io/pypi/v/undetected) ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/undetected) ![License](https://img.shields.io/pypi/l/undetected) ![Downloads](https://img.shields.io/pypi/dm/undetected)
-
 A Selenium Chrome drop-in that hardens automation against common bot checks.
 
 It patches the chromedriver binary (CDC / `test-type=webdriver`) and injects page-level scripts on every `uc.Chrome()` session (CDP leak cleanup, `navigator.webdriver`, chrome runtime, iframes, WebGL, and more).
@@ -11,7 +9,7 @@ It patches the chromedriver binary (CDC / `test-type=webdriver`) and injects pag
 ## Installation
 
 ```bash
-pip install undetected
+pip install git+https://github.com/lovebrownie/undetected.git
 ```
 
 ## Simple Usage
