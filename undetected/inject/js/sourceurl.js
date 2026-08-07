@@ -2,9 +2,9 @@
 
 () => {
   const MARKER_RE =
-    /\/\/# sourceURL=\s*(?:__cfx_|__puppeteer_evaluation_script__|__webdriver|__selenium|__driver|pptr:)[^\n]*/g
+    /\/\/# sourceURL=\s*(?:__cfx_|__puppeteer_evaluation_script__|__playwright|__webdriver|__selenium|__driver|pptr:)[^\n]*/g
   const STACK_MARKER_RE =
-    /(?:__cfx_|__puppeteer_evaluation_script__|__webdriver|__selenium|__driver|chromedriver|selenium|pptr:evaluate)/i
+    /(?:__cfx_|__puppeteer_evaluation_script__|__playwright|__webdriver|__selenium|__driver|chromedriver|selenium|pptr:evaluate)/i
 
   const nativeStackDesc = Object.getOwnPropertyDescriptor(Error.prototype, 'stack')
   if (!nativeStackDesc || !nativeStackDesc.get) {

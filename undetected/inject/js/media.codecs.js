@@ -58,10 +58,42 @@
     }
   }
 
+  const isKnownGood = (mime, codecs) => {
+    if (codecs.length) {
+      return codecs.some((codec) => /^(avc1|h264|mp4a|aac)/i.test(codec))
+    }
+    return [
+      'video/mp4',
+      'audio/mp4',
+      'audio/aac',
+      'audio/x-m4a',
+      'audio/mpeg'
+    ].includes(mime.toLowerCase())
+  }
+
   /* global HTMLMediaElement */
   utils.replaceWithProxy(
     HTMLMediaElement.prototype,
     'canPlayType',
     canPlayType
   )
+
+  if (
+    typeof MediaSource !== 'undefined' &&
+    typeof MediaSource.isTypeSupported === 'function'
+  ) {
+    const isTypeSupported = {
+      apply(target, ctx, args) {
+        if (!args || !args.length) {
+          return Reflect.apply(target, ctx, args)
+        }
+        const { mime, codecs } = parseInput(args[0])
+        if (isKnownGood(mime, codecs)) {
+          return true
+        }
+        return Reflect.apply(target, ctx, args)
+      }
+    }
+    utils.replaceWithProxy(MediaSource, 'isTypeSupported', isTypeSupported)
+  }
 }

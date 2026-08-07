@@ -24,6 +24,13 @@ from urllib.request import urlopen
 import certifi
 from packaging.version import Version
 
+from .cdc import (
+    UC_CDC_MARKER,
+    UC_PATCH_MARKERS,
+    blank_substrings,
+    content_has_patch_marker,
+    patch_cdc_content,
+)
 from .utils.info import IS_POSIX, get_browser_info
 
 logger = logging.getLogger(__name__)
@@ -379,7 +386,7 @@ class Patcher:
             try:
                 with open(driver_executable_path, "rb") as fh:
                     content = fh.read()
-                return b"{/*uc*/" in content or b"undetected chromedriver" in content
+                return content_has_patch_marker(content, UC_PATCH_MARKERS)
             except FileNotFoundError:
                 return False
             except PermissionError:
@@ -394,29 +401,21 @@ class Patcher:
         logger.info("patching driver executable %s" % self.driver_executable_path)
         with open(self.driver_executable_path, "r+b") as fh:
             content = fh.read()
-            match_injected_codeblock = re.search(rb"\{window\.cdc.*?;\}", content)
-            if match_injected_codeblock:
-                target_bytes = match_injected_codeblock[0]
-                # Quiet NOP with a short marker for is_binary_patched().
-                marker = b"{/*uc*/"
-                if len(target_bytes) < len(marker) + 1:
-                    new_target_bytes = b" " * len(target_bytes)
-                else:
-                    new_target_bytes = (
-                        marker + (b" " * (len(target_bytes) - len(marker) - 1)) + b"}"
+            # Patcher blanks test-type only; keep enable-automation for remote debugging.
+            updated, changed = patch_cdc_content(
+                content,
+                marker=UC_CDC_MARKER,
+                blank=(b"test-type=webdriver",),
+            )
+            if not changed:
+                if not content_has_patch_marker(content, UC_PATCH_MARKERS):
+                    logger.warning(
+                        "something went wrong patching the driver binary. "
+                        "could not find injection code block"
                     )
-                content = content.replace(target_bytes, new_target_bytes, 1)
-            else:
-                logger.warning(
-                    "something went wrong patching the driver binary. could not find injection code block"
-                )
-
-            test_type = b"test-type=webdriver"
-            if test_type in content:
-                content = content.replace(test_type, b" " * len(test_type))
-
+                updated = blank_substrings(content, (b"test-type=webdriver",))
             fh.seek(0)
-            fh.write(content)
+            fh.write(updated)
             fh.truncate()
         logger.debug(f"patching took us {time.perf_counter() - start:.2f} seconds")
 

@@ -2,7 +2,7 @@
 
 () => {
   const LEAK_RE =
-    /^(?:\$cdc_|cdc_|__driver|__webdriver|__selenium|__fxdriver|_\$webdriver|_\$chrome|_\$cdc|_Selenium|_selenium|calledSelenium|webdriver_|selenium_|domAutomation|domAutomationController|__\$webdriverAsyncExecutor|__lastWatir)/i
+    /^(?:\$cdc_|cdc_|__driver|__webdriver|__selenium|__fxdriver|__playwright|_\$webdriver|_\$chrome|_\$cdc|_Selenium|_selenium|calledSelenium|webdriver_|selenium_|domAutomation|domAutomationController|__\$webdriverAsyncExecutor|__lastWatir)/i
 
   const WINDOW_LEAKS = new Set([
     '__driver_evaluate',
