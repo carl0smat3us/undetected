@@ -281,6 +281,39 @@ class Patcher:
                     return Version(match[1].decode())
 
     @classmethod
+    def get_driver_major_version(cls, driver_executable_path) -> int | None:
+        """
+        Read the cached chromedriver's major version.
+
+        Uses the Win32 file version on Windows (no process spawn), and
+        ``chromedriver --version`` elsewhere. Returns None when the version
+        cannot be determined.
+        """
+        driver_executable_path = str(driver_executable_path)
+        try:
+            if sys.platform == "win32":
+                from .utils.info import _win_file_version
+
+                ver = _win_file_version(driver_executable_path)
+                if ver:
+                    return int(ver.split(".")[0])
+            output = subprocess.run(
+                [driver_executable_path, "--version"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
+            )
+            match = re.search(r"ChromeDriver\s+(\d+)\.", output.stdout or "")
+            if match:
+                return int(match.group(1))
+        except Exception:
+            logger.debug(
+                "could not read chromedriver version from %s", driver_executable_path
+            )
+        return None
+
+    @classmethod
     def fetch_package(cls, full_version):
         """
         Downloads ChromeDriver from source
@@ -506,7 +539,11 @@ class Patcher:
                 )
                 if files:
                     most_recent = max(files, key=lambda f: f.stat().st_mtime)
-                    if probe.is_binary_patched(most_recent):
+                    if (
+                        probe.is_binary_patched(most_recent)
+                        and cls.get_driver_major_version(most_recent)
+                        == probe.version_main
+                    ):
                         return
                 probe.cleanup_unused_files()
                 probe.download_and_patch()

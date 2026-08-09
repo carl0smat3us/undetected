@@ -414,6 +414,13 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
         if not desired_capabilities:
             desired_capabilities = options.to_capabilities()
 
+        if sys.platform == "win32":
+            # Chrome 137+ auto-de-elevates when launched from an elevated
+            # process: the original chrome.exe exits (code 0) and the
+            # relaunch can lose the profile-singleton race, so chromedriver
+            # never sees the DevTools port ("cannot connect to chrome").
+            options.add_argument("--do-not-de-elevate")
+
         if not use_subprocess:
             self.browser_pid = start_detached(
                 options.binary_location, *options.arguments
