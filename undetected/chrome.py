@@ -95,6 +95,7 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
         debug=False,
         no_sandbox=True,
         user_multi_procs: bool = False,
+        injects: bool = False,
         **kw,
     ):
         """
@@ -193,6 +194,9 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
             Shares one patched chromedriver and skips deleting it on quit so
             concurrent sessions do not fight over the binary. The first Chrome()
             call patches automatically — no Patcher.patch() needed.
+
+        injects:
+            switch injects on/off
         """
 
         finalize(self, self._ensure_close, self)
@@ -296,7 +300,7 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
                     )
 
         if not user_data_dir:
-            # backward compatiblity
+            # backward compatibility
             # check if an old uc.ChromeOptions is used, and extract the user data dir
 
             if hasattr(options, "user_data_dir") and getattr(
@@ -470,7 +474,9 @@ class Chrome(selenium.webdriver.chrome.webdriver.WebDriver):
             self._web_element_cls = WebElement
 
         langs = normalize_languages(getattr(options, "languages", None) or language)
-        _inject(self, languages=langs, fix_hairline=True)
+
+        if injects:
+            _inject(self, languages=langs, fix_hairline=True)
 
     def get(self, url):
         return super().get(url)
