@@ -5,6 +5,9 @@ A Selenium Chrome drop-in that hardens automation against common bot checks.
 It patches the chromedriver binary (CDC / `test-type=webdriver`) and injects page-level scripts on every `uc.Chrome()` session (CDP leak cleanup, `navigator.webdriver`, chrome runtime, iframes, WebGL, and more).
 
 **Note:** Fork of [`undetected-chromedriver`](https://github.com/ultrafunkamsterdam/undetected-chromedriver). Results vary - these patches help, but they are not a guarantee against every detector.
+This repository is a fork of the fork with following changes:
+- switch backend to flit allowing proper build (hatch does not work with setup-dist)
+- make injections optional due to bot-detection issues
 
 ## Installation
 

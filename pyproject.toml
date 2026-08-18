@@ -1,9 +1,10 @@
 [project]
-name = "undetected"
-version = "1.0.1"
+name = "undetected-updated"
+version = "1.0.2"
 description = "Selenium Chrome drop-in with chromedriver patching and automatic page-level JS injection."
 authors = [
     { name = "lovebrownie", email = "91576261+lovebrownie@users.noreply.github.com" },
+    { name = "dornech", email = "dornech@gmx.de" }
 ]
 license = { file = "LICENSE" }
 readme = "README.md"
@@ -20,9 +21,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/lovebrownie/undetected"
-Issues = "https://github.com/lovebrownie/undetected/issues"
-Repository = "https://github.com/lovebrownie/undetected"
+Homepage = "https://github.com/dornech/undetected"
+Issues = "https://github.com/dornech/undetected/issues"
+Repository = "https://github.com/dornech/undetected"
 
 [dependency-groups]
 dev = [
@@ -36,6 +37,9 @@ requires = ["flit_core >=3.11,<5"]
 build-backend = "flit_core.buildapi"
 # requires = ["hatchling"]
 # build-backend = "hatchling.build"
+
+[tool.flit.module]
+name = "undetected"
 
 [tool.hatch.build]
 packages = ["undetected"]
